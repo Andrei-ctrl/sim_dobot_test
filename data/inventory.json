@@ -1,0 +1,11 @@
+{
+  "BEER_BOTTLE": {
+    "name": "Beer Bottle",
+    "category": "Drinks",
+    "storage_stock": 3,
+    "front_stock": 2,
+    "threshold": 2,
+    "storage_shelf": "STORAGE_DRINKS",
+    "front_shelf": "FRONT_DRINKS"
+  }
+}
