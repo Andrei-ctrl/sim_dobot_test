@@ -1,0 +1,1410 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/ThreadMetalPlate.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/computers/protos/Monitor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/valves/protos/LeverValve.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/pallet/protos/WoodenPalletStack.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/CardboardBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Roughcast.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/solids/protos/SolidBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/GalvanizedMetal.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/CorrugatedMetal.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/conveyors/protos/ConveyorBelt.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/pallet/protos/WoodenPallet.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/drinks/protos/BeerBottle.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/ChipsPack.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/MilkCarton.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/CheeseWedge.proto"
+EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/YoubotBoxGrip.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/softbank/nao/protos/Shelves.proto"
+EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/IprHd6ms180.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/generic/TruckSimple.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/UnevenTerrain.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Door.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/ParkingLines.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/toys/protos/RubberDuck.proto"
+
+WorldInfo {
+  info [
+    "Universal Robot UR3e, UR5e and UR10e grasping cans using Robotiq 3F grippers."
+  ]
+  title "Exception Handling"
+  basicTimeStep 16
+  physicsDisableAngularThreshold 0.1
+  contactProperties [
+    ContactProperties {
+      bounce 0.1
+    }
+    ContactProperties {
+      material1 "slope"
+      coulombFriction [
+        0.5
+      ]
+    }
+    ContactProperties {
+      material1 "InteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation -0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+    ContactProperties {
+      material1 "ExteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation 0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+  ]
+}
+Viewpoint {
+  orientation 0.39595003247083527 0.014007705367693666 -0.9181652117003107 3.061797057807144
+  position 2.3589718810888556 0.7247757315603304 2.5062866621456297
+  exposure 1.7
+}
+TexturedBackground {
+  texture "factory"
+}
+Floor {
+  translation -4 0 0
+  size 35 20
+  appearance ThreadMetalPlate {
+  }
+}
+RubberDuck {
+  translation 0.53924 0.380001 0.174215
+  rotation -0.0016810349696355675 6.789591171383264e-08 0.9999985870597151 3.1415899997278323
+}
+Solid {
+  translation -28 0 0.002
+  children [
+    Shape {
+      appearance Parquetry {
+        type "dark strip"
+        colorOverride 0 0 0
+      }
+      geometry Box {
+        size 20 20 0.004
+      }
+    }
+  ]
+  name "floor(1)"
+}
+ParkingLines {
+  translation -18.3 -2.08 0.1
+  rotation 0 0 1 1.5708
+}
+ParkingLines {
+  translation -28.68 -2.08001 0.1
+  rotation 0 0 1 1.5708
+}
+Door {
+  hidden translation_5 0.0012238800910693848 7.016970637446773e-05 6.661338147750939e-16
+  hidden rotation_5 0 0 -1 0.0004712916875327881
+  hidden linearVelocity_5 1.3491774685282224e-10 6.004057174429828e-09 -0.0019076864095788405
+  hidden angularVelocity_5 0.0007536115448358431 -4.0400858181959604e-05 -3.8525872155631944e-10
+  translation -18.09 -6.48 0
+  rotation 0 0 1 3.14159
+  position -0.00047129168784367295
+}
+UnevenTerrain {
+  translation 20 0 -3.12
+  size 20 20 5
+}
+TruckSimple {
+  translation 17.76 1.13 0.82
+}
+DEF STORAGE_DRINKS Pose {
+  translation -17 1 0.85
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.5 0.9
+        transparency 0.85
+      }
+      geometry Box {
+        size 0.35 0.35 0.02
+      }
+    }
+  ]
+}
+Shelves {
+  translation -11.5 4.35 0
+  rotation 0 0 1 3.141592653589793
+  name "Chips section"
+}
+Shelves {
+  translation -11.5 6.1 0
+  rotation 0 0 1 3.14
+  name "Cheese section"
+}
+Shelves {
+  translation -11.5 7.9 0
+  rotation 0 0 1 3.14
+  name "Milk section"
+}
+Shelves {
+  translation -11.5 2.7 0
+  rotation 0 0 1 -3.141592653589793
+  name "Beer section"
+}
+ChipsPack {
+  hidden linearVelocity_0 -2.4367897348085862e-18 1.808848496763987e-18 -2.9531932455029166e-15
+  hidden angularVelocity_0 -2.465190328815662e-31 -9.860761315262648e-32 3.683475767808444e-17
+  translation -11.5697 4.54 0.8324843040000003
+  rotation 1.4836402556754514e-18 -1.2794887045001055e-17 1 3.14159
+  name "demo_chips_item"
+}
+MilkCarton {
+  hidden linearVelocity_0 4.580777452494879e-17 -1.6835163862519057e-17 -2.184918912462308e-15
+  hidden angularVelocity_0 2.3579958045136055e-16 7.073987413540821e-16 -4.289134653737167e-17
+  translation -11.5697 8.15001 0.8699803800000002
+  rotation 2.7352757589512087e-17 -4.715955317536335e-18 1 3.14159
+  name "demo_milk_item"
+}
+CheeseWedge {
+  hidden linearVelocity_0 -4.743755492373906e-18 -3.0130970963943684e-17 -2.1118909090647422e-15
+  hidden angularVelocity_0 1.8200377452817006e-15 -2.05031614402033e-21 -1.8106280188246417e-16
+  translation -11.5697 6.29 0.8399823420000002
+  rotation 1.1172054378738888e-17 6.0668291773470484e-18 1 3.14159
+  name "demo_cheese_item"
+}
+BeerBottle {
+  hidden linearVelocity_0 3.031771487466036e-16 -2.2384906415327186e-17 -9.592326932761351e-16
+  hidden angularVelocity_0 -3.944304526105059e-30 9.749787361508509e-15 -2.1306500856925785e-15
+  translation -11.5697 2.89 0.8127303800000001
+  rotation 1.9192991101455456e-15 5.005085162585826e-16 1 3.1415899999999977
+  name "demo_beer_item"
+}
+BeerBottle {
+  hidden linearVelocity_0 4.080511578780721e-18 4.072034025151064e-17 2.5579538487363606e-15
+  hidden angularVelocity_0 -4.18950309493375e-16 7.554642858007519e-17 -9.987524392915739e-18
+  translation -11.5697 2.89 0.48246075999999977
+  rotation 8.978955383970903e-16 2.2746220716699324e-15 1 3.141589999999998
+  name "demo_beer_item(3)"
+}
+BeerBottle {
+  hidden linearVelocity_0 -2.699882017430933e-17 -3.6131511484562737e-17 -3.9079850466805456e-16
+  hidden angularVelocity_0 1.262177448353619e-29 2.8427711643864106e-15 9.69397746811294e-15
+  translation -11.5697 2.7200000000000006 0.8127303800000001
+  rotation 1.1274248425730895e-15 1.4958615358844611e-21 1 3.141589999999998
+  name "demo_beer_item(1)"
+}
+BeerBottle {
+  hidden linearVelocity_0 -1.6127896950585178e-17 4.466077598717591e-17 2.540190280342358e-15
+  hidden angularVelocity_0 -4.189503094933751e-16 -2.1123100931528325e-16 6.960321018509905e-17
+  translation -11.5697 2.72 0.48246075999999977
+  rotation 9.206716799199343e-16 2.4043570477292134e-15 1 3.141589999999998
+  name "demo_beer_item(4)"
+}
+BeerBottle {
+  hidden linearVelocity_0 7.77023714725372e-17 7.969918527245842e-17 2.4513724383723455e-15
+  hidden angularVelocity_0 -6.703204951893993e-15 5.494882945677485e-15 1.4984877939851427e-15
+  translation -11.5697 2.5300000000000002 0.8127303800000001
+  rotation 2.3875709149213276e-16 1.787552998678264e-17 1 3.1415900000000003
+  name "demo_beer_item(2)"
+}
+BeerBottle {
+  hidden linearVelocity_0 -4.224882901278264e-17 4.3414426908853544e-17 2.5579538487363606e-15
+  hidden angularVelocity_0 -4.189503094933753e-16 -4.2306213093988855e-16 1.4562413433818453e-17
+  translation -11.5697 2.53 0.48246075999999977
+  rotation 1.0938111406945099e-15 2.5413540286543408e-15 1 3.141589999999998
+  name "demo_beer_item(5)"
+}
+DEF STORE_YOUBOT_SORTER YoubotBoxGrip {
+  hidden position_0_0 -18.330843357764767
+  hidden position_0_1 108.90050289306637
+  hidden position_0_2 108.90050153169598
+  hidden position_0_3 -18.33084528952735
+  hidden linearVelocity_0 -5.233732094726034e-07 9.889385937999859e-09 -3.2602422697375383e-06
+  hidden angularVelocity_0 -1.4561107722225065e-07 -1.182748457554429e-05 5.873818715527507e-10
+  hidden position_2_0 -5.301399038647149e-07
+  hidden rotation_3 0 0 -1 5.297776709387073e-07
+  hidden position_3_0 -3.683843227150329e-07
+  hidden linearVelocity_3 -2.980017125696608e-06 -1.2192643431415993e-07 -0.00046952668507689815
+  hidden angularVelocity_3 5.084914300324328e-07 -2.7181213473204997e-05 8.07652398228386e-06
+  hidden rotation_4 0 1 0 3.686343692795336e-07
+  hidden position_4_0 -3.547538372005317e-07
+  hidden linearVelocity_4 -5.876788171991922e-06 -2.3164034145629204e-07 -0.0007445094470137846
+  hidden angularVelocity_4 -5.759761885920089e-07 -2.794657511035045e-05 8.076520188597093e-06
+  hidden rotation_5 0 1 0 3.5513565802016856e-07
+  hidden position_5_0 -4.108631582316565e-07
+  hidden linearVelocity_5 -9.287047086919576e-06 -2.6412038705007064e-07 -0.0009281665832167806
+  hidden angularVelocity_5 1.0742102053578347e-06 -2.7661910201223208e-05 8.077588942352805e-06
+  hidden rotation_6 0 1 0 4.107966647175028e-07
+  hidden position_6_0 -2.050955352645768e-07
+  hidden linearVelocity_6 -1.2049030400638501e-05 -3.6736027290231657e-07 -0.0010382445029425776
+  hidden angularVelocity_6 1.0664500266224335e-06 -2.767445190618659e-05 8.077743755418768e-06
+  hidden rotation_7 0 0 -1 2.043144285798385e-07
+  hidden position_7_0 -6.249713317754822e-09
+  hidden position_7_1 -2.737318910643853e-08
+  hidden linearVelocity_7 -1.493399058754057e-05 -4.7430325500564246e-07 -0.0010792858123977735
+  hidden angularVelocity_7 1.0208737686940139e-06 -3.096904739043948e-05 1.0813777487685225e-05
+  hidden linearVelocity_9 -1.4067845596397075e-05 -2.1143099916310287e-06 -0.0010946748071153272
+  hidden angularVelocity_9 1.1046783814626583e-06 -3.1571147469784715e-05 1.1159723313314952e-05
+  hidden translation_14 0.005700052751294926 -8.109517781185183e-06 0.03249998338432469
+  hidden rotation_14 -6.812222766743645e-11 -1 1.2699169064398055e-11 -0.1920000000000064
+  hidden linearVelocity_14 -1.401429887131644e-05 -1.860315861781119e-06 -0.001097899130743265
+  hidden angularVelocity_14 1.1046782471690955e-06 -3.157114650897517e-05 1.1159723291593097e-05
+  hidden translation_15 -9.319246707661932e-08 -8.111237984942399e-06 0.08370015180596724
+  hidden rotation_15 0.9718975532189728 0.0008408834472669243 -0.23540271655612288 7.459725969776347e-12
+  hidden linearVelocity_15 -1.4100345133300185e-05 -2.4453728908726396e-06 -0.0010995454848456454
+  hidden angularVelocity_15 1.1046784126053704e-06 -3.157114693147286e-05 1.1159723272526238e-05
+  hidden rotation_17 0 0.9999999999999999 0 2.9802322387695313e-08
+  hidden linearVelocity_17 -1.4235882339645739e-05 -2.0458741408095708e-06 -0.0010946537823224491
+  hidden angularVelocity_17 9.189179206219791e-07 -3.1569323646253036e-05 9.92191206921258e-06
+  hidden translation_22 -0.00770002797142233 -8.108893132074968e-06 0.03250000205077086
+  hidden rotation_22 -8.536080527123195e-13 -1 -5.6378897655900864e-12 -2.949685307179596
+  hidden linearVelocity_22 -1.4296148217168153e-05 -1.8190248760282402e-06 -0.0010978640075345858
+  hidden angularVelocity_22 9.189180515829885e-07 -3.1569322532569034e-05 9.921912061416465e-06
+  hidden translation_23 -4.7225201527112404e-08 -8.111005211142164e-06 0.0837001411795697
+  hidden rotation_23 -8.743561439818016e-13 -1 -3.644473615696605e-12 3.1414999999999873
+  hidden linearVelocity_23 -1.420267377135392e-05 -2.340816203609879e-06 -0.0010995326199089916
+  hidden angularVelocity_23 9.189179287191349e-07 -3.156932291916338e-05 9.92191204501892e-06
+  hidden rotation_24 0 -1 0 5.764472743405594
+  hidden linearVelocity_24 -4.297695318018253e-07 -8.226512797165908e-08 0.0006682027833658567
+  hidden angularVelocity_24 -1.5979977249662522e-07 -1.1823630163984442e-05 5.843079912418247e-10
+  hidden rotation_25 0 -1 0 4.1968326361661825
+  hidden linearVelocity_25 -4.263335677220752e-07 9.761070461383748e-08 0.0006706971199854906
+  hidden angularVelocity_25 -1.496759756918793e-07 -1.1823790903661165e-05 5.8453689429906e-10
+  hidden rotation_26 0 -1 0 4.196833997536577
+  hidden linearVelocity_26 -4.319441179779714e-07 9.098447805925073e-08 0.00047066207308539283
+  hidden angularVelocity_26 -1.504177528436605e-07 -1.182372545428673e-05 5.845401188563395e-10
+  hidden rotation_27 0 -1 0 5.764474675168177
+  hidden linearVelocity_27 -4.350542911352692e-07 -7.540468672698197e-08 0.00047315640570680276
+  hidden angularVelocity_27 -1.5990632937232977e-07 -1.1823556621581345e-05 5.843093850282115e-10
+  translation -9.313467458581279 7.7665105493197935 0.10191705072102104
+  rotation -0.0011332603595232498 -1.460796487360233e-05 0.9999993577535762 3.132019975065084
+  name "youBot sorter"
+  controller "youbot_sorter_demo"
+  supervisor TRUE
+  bodySlot [
+    Pose {
+      translation 0 0.08 0.14
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.35 0.35 0.4
+            transparency 0.5
+            roughness 0.6
+          }
+          geometry Box {
+            size 0.22 0.18 0.02
+          }
+        }
+      ]
+    }
+    DistanceSensor {
+      translation 0.24 0 0.14
+      rotation 0 1 0 1.5707963267948966
+      name "front distance sensor"
+      lookupTable [
+        0 4095 0
+        0.05 3200 0.01
+        0.15 1800 0.02
+        0.35 700 0.04
+        0.6 150 0.06
+        1 0 0.08
+      ]
+      type "infra-red"
+    }
+  ]
+}
+DEF STORE_YOUBOT_RESTOCKER YoubotBoxGrip {
+  hidden position_0_0 253.8672597275354
+  hidden position_0_1 358.13320977182525
+  hidden position_0_2 253.86734571601914
+  hidden position_0_3 358.13329532201834
+  hidden linearVelocity_0 0.0008198823783025447 9.33154533350194e-06 -0.015328189700366255
+  hidden angularVelocity_0 -0.00014709572923656285 0.012926096168906819 -7.309749541767227e-08
+  hidden position_1_0 -5.441557038859003e-07
+  hidden rotation_2 3.5276250454266194e-10 -3.1930557642918254e-08 0.9999999999999994 5.103685777412213e-06
+  hidden position_2_0 -0.9500063506992276
+  hidden linearVelocity_2 0.0029633564111881264 3.363809404340441e-05 -0.01801704222130714
+  hidden angularVelocity_2 -0.00014797264639109463 0.01299348944765655 -5.447000697187537e-06
+  hidden rotation_3 0 1 0 0.9500063506992275
+  hidden position_3_0 -0.12000306368262961
+  hidden linearVelocity_3 0.003800027365729404 4.267480307342003e-05 -0.01936613702636209
+  hidden angularVelocity_3 -0.00014675930482388575 0.012983819540291493 -5.4883221067815674e-06
+  hidden rotation_4 0 1 0 0.12000306368263029
+  hidden position_4_0 -8.225605259670167e-07
+  hidden linearVelocity_4 0.004776601763641016 5.3114932663848326e-05 -0.021125265721574502
+  hidden angularVelocity_4 -0.0001485342900943875 0.012977202229989219 -5.435528758108375e-06
+  hidden rotation_5 0 1 0 8.226736630107378e-07
+  hidden position_5_0 -2.9739651661165654e-08
+  hidden linearVelocity_5 0.005367994027196273 5.942911331856076e-05 -0.0223329706098342
+  hidden angularVelocity_5 -0.00014852937384609967 0.012975877477616242 -5.438002263420216e-06
+  hidden rotation_6 0 0 -1 2.9802322387695313e-08
+  hidden position_6_0 1.1999999713269336
+  hidden position_6_1 1.199999961176657
+  hidden linearVelocity_6 0.005987291155142466 6.604058984318581e-05 -0.023515813714150614
+  hidden angularVelocity_6 -0.0001486106111478867 0.012978331494973924 -5.484849572358519e-06
+  hidden rotation_8 0 1 0 1.1999999713269336
+  hidden linearVelocity_8 0.00457368167221881 4.9680570463736726e-05 -0.0239357925229607
+  hidden angularVelocity_8 -0.00014882703766868496 0.012978403033902545 -5.240366661044297e-06
+  hidden translation_13 0.005695582618478134 -2.4914550627030962e-06 0.03249355659021583
+  hidden rotation_13 -5.589591848786054e-11 1 7.231599968481351e-12 0.19199999999791667
+  hidden linearVelocity_13 0.0047147952704125525 5.133114824735958e-05 -0.023859950674318196
+  hidden angularVelocity_13 -0.0001488270309266241 0.012978402997080961 -5.240377063978237e-06
+  hidden translation_14 1.2593484253198284e-06 8.026138393901761e-07 0.08371049585989573
+  hidden rotation_14 -0.9790069910403205 -0.13213098429970854 0.155198951292101 6.28796799540733e-12
+  hidden linearVelocity_14 0.004418083196299581 4.786052586050267e-05 -0.02402870929606323
+  hidden angularVelocity_14 -0.00014882703236008545 0.012978402999615089 -5.240375501431704e-06
+  hidden rotation_16 0 -1 0 1.199999961176657
+  hidden linearVelocity_16 0.004573112347804131 4.967691772349641e-05 -0.023919960029941983
+  hidden angularVelocity_16 -0.00014880836754894937 0.012978399075911157 -5.9568949441518755e-06
+  hidden translation_21 -0.007695561153050479 -2.0179081405835575e-06 0.03249377598586689
+  hidden rotation_21 -9.445930288990722e-13 1 4.9887818095235476e-12 2.9496853071761766
+  hidden linearVelocity_21 0.004735674428179855 5.1580310589008516e-05 -0.023838288124805356
+  hidden angularVelocity_21 -0.00014880837211811857 0.012978399039199713 -5.95688454542811e-06
+  hidden translation_22 -1.5200077911892151e-06 -1.0715003695427328e-07 0.08371059794572222
+  hidden rotation_22 -6.48675558408948e-13 1 2.734382168071333e-12 -3.1415000000019595
+  hidden linearVelocity_22 0.004417224879277995 4.7852514568549834e-05 -0.024004963368350795
+  hidden angularVelocity_22 -0.0001488083717858603 0.012978399041724178 -5.956886113240179e-06
+  hidden rotation_23 -8.845321548523513e-22 1 5.719502884628875e-21 2.53984733711368
+  hidden linearVelocity_23 0.0006292546443020108 1.5703121618400042e-05 -0.017418529844911212
+  hidden angularVelocity_23 -0.0001466542757652068 0.012925659237466212 -7.327858554421764e-08
+  hidden rotation_24 0 1 0 6.274832462314563
+  hidden linearVelocity_24 0.0006290117098709414 -1.4238332893157235e-06 -0.017462559700554187
+  hidden angularVelocity_24 -0.00014750887900814717 0.012925668507433513 -7.338042495224136e-08
+  hidden rotation_25 -3.4417291072183945e-22 1 1.6394153132918683e-21 2.539933386688837
+  hidden linearVelocity_25 0.0006361321564155731 2.2043736767152213e-06 -0.011841026105036897
+  hidden angularVelocity_25 -0.0001473367638388041 0.012925842252711392 -7.327528070313291e-08
+  hidden rotation_26 0 1 0 6.274918119961495
+  hidden linearVelocity_26 0.0006361962775944786 1.2317710707450137e-05 -0.011885055960653155
+  hidden angularVelocity_26 -0.00014682894187660118 0.012925836166064896 -7.339327856594025e-08
+  translation -1.8744886090790223 0.5737752434500532 0.10321326312687913
+  rotation -0.01108204920196839 0.999938592199229 4.013593120774278e-06 0.0019950308171877897
+  name "youBot restocker"
+  controller "youbot_restocker_demo"
+  supervisor TRUE
+}
+Group {
+  children [
+    Pose {
+      translation 7.47 0.6 0.990001
+      rotation 0.5773509358554485 -0.5773489358556708 -0.5773509358554485 2.094395307179586
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0 0 0
+            roughness 1
+            metalness 0
+          }
+          geometry Box {
+            size 1 0.8 0.01
+          }
+        }
+      ]
+    }
+    Wall {
+      translation -3.95 -9.97 0
+      name "wall(1)"
+      size 28 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -1.01 -0.64 0.47
+      name "wall(3)"
+      size 0.1 1.3 0.9
+    }
+    Wall {
+      translation 0.14 1.14 0
+      rotation 0 0 1 -1.5707953071795862
+      name "wall(13)"
+      size 0.1 2.4 1.4
+    }
+    Wall {
+      translation 0.14 -0.03 0
+      rotation 0 0 1 -1.5707953071795862
+      name "wall(6)"
+      size 0.1 2.4 1.4
+    }
+    LeverValve {
+      hidden position_0_0 -8.171223582653096e-07
+      hidden translation_1 0 3.233467318875308e-08 -2.6204732828105648e-14
+      hidden rotation_1 -1 0 0 1.6173080863017445e-06
+      hidden linearVelocity_1 8.174333980254231e-09 1.09419064536973e-07 -5.677414409730869e-06
+      hidden angularVelocity_1 -7.849147259049239e-07 5.864991821468212e-08 2.0292015559912477e-13
+      translation 2.01 0.88 0.502
+      rotation 0 0 -1 -1.5707953071795862
+    }
+    WoodenPalletStack {
+      translation 0.66 -1.71 0
+      rotation 0 0 1 -1.5707953071795862
+      palletNumber 5
+      palletSize 0.8 1 0.11
+    }
+    Wall {
+      translation -4.105 9.89 0
+      rotation 0 1 0 0
+      size 28 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -18.05 -0.0400001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall"
+      size 20 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation 9.87 6.49003 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(2)"
+      size 7 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation 10.01 -5.36997 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(3)"
+      size 9 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 -3.84999 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(1)"
+      size 12.2 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 3.51001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(4)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 3.51001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(5)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 5.25001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(6)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 7.00001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(7)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 9.12001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(9)"
+      size 1.5 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 2.63001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 4.40001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(1)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 6.14001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(2)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 7.89001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(3)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+  ]
+}
+SolidBox {
+  translation -2.205 0.5377 -0.585
+  size 1 0.8 0.61
+  appearance GalvanizedMetal {
+  }
+}
+ConveyorBelt {
+  hidden translation_1 0.0023224729132467203 -1.9338471934915447e-09 0.12690790305905225
+  hidden rotation_1 4.1069227345476066e-05 0.9999999991566488 -1.4532892314376794e-07 0.0033829376190653224
+  hidden linearVelocity_1 -8.516715282280087e-05 5.593056407513974e-08 0.019273515047749667
+  hidden angularVelocity_1 -4.120983092661513e-07 -0.00399825661625588 -3.1645595285789863e-07
+  translation 3.7 0.54 0
+  rotation 0 0 1 3.141592
+  name "conveyor_cardbox"
+  size 10 0.7 0.15
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0.2
+}
+ConveyorBelt {
+  hidden translation_1 0 0 0.18745836663016838
+  hidden rotation_1 0 0 1 2.168404344971009e-19
+  hidden linearVelocity_1 0 0 -7.850446375468323e-05
+  translation -5.24 -0.625782 -0.01
+  rotation 0 0 1 3.14
+  name "conveyor belt(1)"
+  size 5 1 0.25
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0.1
+  acceleration 0.012
+}
+Robot {
+  translation -0.67 1.77 0
+  children [
+    Receiver {
+      name "rx"
+      channel 1
+    }
+  ]
+  name "conveyor_pallet_left"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF RIGHT_BELT ConveyorBelt {
+  hidden translation_1 0 0 0.18745836663016838
+  hidden rotation_1 0 0 1 2.168404344971009e-19
+  hidden linearVelocity_1 0 0 -7.850446375468323e-05
+  translation -0.67 -0.65 0
+  rotation 0 0 1 3.14
+  name "conveyor belt(2)"
+  size 4 1 0.25
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0
+}
+Robot {
+  translation -0.67 -0.65 0
+  children [
+    Receiver {
+      name "rx"
+      channel 2
+    }
+  ]
+  name "conveyor_pallet_right"
+  controller "<none>"
+  supervisor TRUE
+}
+Robot {
+  translation 0 -0.62 0.54
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "right_pallet_spawner"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF IPR_BOX_SPAWN_PAD Robot {
+  translation 9.38 1.19 -0.1
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "right_pallet_spawner(1)"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF BEER_STOCK Robot {
+  translation -10.5 1.83 -0.12
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "BEER STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF CHIPS_STOCK Robot {
+  translation -10.5 3.5 -0.09
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "CHIPS STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF CHEESE_STOCK Robot {
+  translation -10.52 5.27 -0.09
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "CHEESE STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF MILK_STOCK Robot {
+  translation -10.51 7.14 -0.08
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "MILK STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+Robot {
+  translation -10.5 4.5 0.5
+  children [
+    DistanceSensor {
+      translation 0 -2.67 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_beer"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 -1 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_chips"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation -0.02 0.77 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_cheese"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation -0.01 2.64 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_milk"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+  ]
+  name "stock_monitoring"
+  controller "stock_monitoring"
+  supervisor TRUE
+}
+Robot {
+  translation -10.8 4.9 1
+  children [
+    DistanceSensor {
+      translation 0 -2.2 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_beer"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 -0.55 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_chips"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 1.2 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_cheese"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 3 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_milk"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+  ]
+  name "shelf_monitoring"
+  controller "shelf_monitoring"
+  supervisor TRUE
+}
+Robot {
+  translation -1.04085 1.18648 1.32
+  rotation 0 0 1 -2.8797953071795863
+  children [
+    Emitter {
+      children [
+        Monitor {
+        }
+      ]
+      name "tx"
+      channel 2
+    }
+  ]
+  name "restocking_task_manager"
+  controller "restocking_task_manager_demo"
+  supervisor TRUE
+}
+Robot {
+  translation -0.01 1.09 0.24
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance GalvanizedMetal {
+      }
+      geometry Box {
+        size 0.1 0.1 0.1
+      }
+    }
+    DistanceSensor {
+      translation -4.07728e-08 0 0.08
+      rotation 0 1 0 -1.5707953071795862
+      lookupTable [
+        0 0 0
+        1 1 0
+      ]
+    }
+  ]
+  name "test_controller_sensor"
+  controller "scanner_controller"
+  supervisor TRUE
+}
+DEF AUTONOMOUS_GROCERY_STORE_PROTOTYPE Group {
+  children [
+    DEF GROCERY_CONVEYOR ConveyorBelt {
+      hidden translation_1 0.002322702282227418 -2.7501604327184737e-09 0.07550237981573182
+      hidden rotation_1 -6.17304168215992e-07 -0.9999999999993205 -9.889046138241307e-07 0.0023883743242585267
+      hidden linearVelocity_1 0.00011552292084437709 -6.678448861264455e-08 -0.01944974589909626
+      hidden angularVelocity_1 -8.129151852900875e-09 -0.0038817744346823523 -2.977773002237957e-07
+      translation 4.1 0.54 0.02
+      name "GROCERY_CONVEYOR"
+      size 3.6 0.7 0.12
+      appearance CorrugatedMetal {
+        textureTransform TextureTransform {
+          scale 4 2
+        }
+      }
+      borderHeight 0
+      speed 0
+    }
+    Solid {
+      translation 4.1 0.54 0.011
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.18 0.18 0.18
+            roughness 0.7
+          }
+          geometry Box {
+            size 6.2 1.05 0.02
+          }
+        }
+      ]
+      name "CONVEYOR_ZONE"
+    }
+    Solid {
+      translation 2.25 0.54 0.015
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.95 0.85 0.05
+            roughness 0.5
+          }
+          geometry Box {
+            size 0.75 0.75 0.03
+          }
+        }
+      ]
+      name "DETECTION_ZONE"
+    }
+  ]
+}
+DEF SPAWNED_BOX_0 CardboardBox {
+  hidden linearVelocity_0 1.3819447886236864e-17 1.5701663209877496e-17 -6.927791673660977e-16
+  hidden angularVelocity_0 -2.498001805406601e-16 5.828670879282066e-16 -1.3204118252538698e-16
+  translation -10.074864650887934 1.6311597282961945 0.1699803800000001
+  rotation -7.608446550866209e-18 -6.436144016868506e-17 1 0.3690238423020529
+  name "SPAWNED_BOX"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+IprHd6ms180 {
+  hidden position_0_0 -1.807699225343362e-07
+  hidden rotation_1 0 0 1 0.12479026503866161
+  hidden position_1_0 3.340542515688334e-07
+  hidden linearVelocity_1 -2.1774608577127945e-09 -7.790974726308902e-11 -0.00030129724752696346
+  hidden angularVelocity_1 5.137803902596068e-06 1.4352233960192495e-07 6.174195026443595e-06
+  hidden rotation_2 -1 0 0 0.5977753340542453
+  hidden position_2_0 -9.74149222804807e-07
+  hidden linearVelocity_2 3.457993023702086e-07 -3.6324359394163544e-07 -0.0005046333500796676
+  hidden angularVelocity_2 4.795305251217365e-06 3.107207358262982e-07 6.17422566512047e-06
+  hidden rotation_3 1 0 0 2.2218009741492226
+  hidden position_3_0 3.278020979917939e-07
+  hidden linearVelocity_3 3.5708840327235265e-07 -7.329826125942529e-07 -0.0006927730633470119
+  hidden angularVelocity_3 4.701315104902255e-06 4.5992073441714903e-07 6.1742258394232636e-06
+  hidden rotation_4 -1 0 0 2.033310327802098
+  hidden position_4_0 -7.430571595826202e-08
+  hidden linearVelocity_4 -1.4488388405742045e-08 -9.151373254792783e-07 -0.0008176650423840708
+  hidden angularVelocity_4 4.663964038822057e-06 5.080491217763905e-07 6.174244869122385e-06
+  hidden rotation_5 0 0 1 2.9931899256942844
+  hidden position_5_0 1.200000043066565
+  hidden position_5_1 1.2000000422947894
+  hidden linearVelocity_5 3.067544688762974e-07 -1.4412760066948161e-06 -0.0008706502837751096
+  hidden angularVelocity_5 6.069327424040525e-06 -4.4492095753790665e-07 8.344809110737338e-06
+  hidden rotation_6 0 1 0 1.200000043066565
+  hidden linearVelocity_6 5.811824115116687e-07 -1.3980103056346405e-06 -0.0008814886376184866
+  hidden angularVelocity_6 6.136548981173687e-06 -2.727796703172021e-07 8.165215318881232e-06
+  hidden translation_11 0.005701840747210252 -8.192090792391582e-07 0.032499518614717005
+  hidden rotation_11 9.555649834120075e-15 1 3.1852166113733583e-15 0.19199999999999057
+  hidden linearVelocity_11 5.209358977038207e-07 -1.4935645097760172e-06 -0.0008853840124506718
+  hidden angularVelocity_11 6.136548993227914e-06 -2.7277969444465877e-07 8.165215287717387e-06
+  hidden translation_12 1.8407474380310873e-06 -8.192084934854904e-07 0.08369951861475045
+  hidden rotation_12 0.23050065951190865 -0.9707818346329399 0.0667238751218683 1.3727230225205596e-14
+  hidden linearVelocity_12 6.532930170065382e-07 -1.251254597299808e-06 -0.000885475388459671
+  hidden angularVelocity_12 6.136548981606573e-06 -2.7277966951420734e-07 8.165215241750876e-06
+  hidden rotation_14 0 -1 0 1.2000000422947892
+  hidden linearVelocity_14 4.5021727779451525e-07 -2.31364621450795e-06 -0.0008814437758819643
+  hidden angularVelocity_14 6.103184609310456e-06 -6.321580825067861e-07 8.519353654472028e-06
+  hidden translation_19 -0.007701764166384351 -8.192098168713358e-07 0.032499287400504784
+  hidden rotation_19 -1.6172628313891023e-15 0.9999999999999999 1.1014117558598197e-15 2.9496853071795757
+  hidden linearVelocity_19 4.3367035337125004e-07 -2.067348787691546e-06 -0.0008853511072199184
+  hidden angularVelocity_19 6.103184611019308e-06 -6.321581379647133e-07 8.519353715967412e-06
+  hidden translation_20 -1.7641661460565672e-06 -8.192102387560851e-07 0.08369928740046273
+  hidden rotation_20 -1.665334538724782e-15 1 1.3877787822706518e-15 -3.141500000000012
+  hidden linearVelocity_20 4.555475934470835e-07 -2.6235233250748487e-06 -0.0008854080491474825
+  hidden angularVelocity_20 6.1031846215621845e-06 -6.321581167630797e-07 8.519353666685247e-06
+  translation 8.93 0.59 0
+  rotation 0 0 -1 -3.0106903061004253
+  controller "ipr_pick_demo"
+  supervisor TRUE
+}
+DEF PRODUCT_CUBE_0 BeerBottle {
+  hidden linearVelocity_0 1.0527234887484055e-16 -1.2040594470686896e-07 3.7299434954007896e-08
+  hidden angularVelocity_0 1.2054775496495664e-06 9.775513230156914e-16 -1.2100349822689608e-17
+  translation -11.569700619186118 2.9099999950009328 0.1004919051982003
+  rotation 0.9999999440803925 9.777732977156697e-09 -0.00033442370102881636 5.54253044527972e-05
+  name "BEER_BOTTLE"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_1 BeerBottle {
+  hidden linearVelocity_0 8.565922394482757e-17 -1.204059446574065e-07 3.7299434936244325e-08
+  hidden angularVelocity_0 1.2054775491104464e-06 8.204455589624907e-16 -2.4251546810260212e-17
+  translation -11.569700619186118 2.6799999950009328 0.1004919051982003
+  rotation 0.9999999440803929 9.762595135695928e-09 -0.0003344236996918699 5.542530445230715e-05
+  name "BEER_BOTTLE(1)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_2 BeerBottle {
+  hidden linearVelocity_0 1.2195518213381044e-16 -1.2040594466891895e-07 3.7299434918480767e-08
+  hidden angularVelocity_0 1.205477549197728e-06 1.1695691573356928e-15 9.242452359195289e-18
+  translation -11.569700619186118 2.459999995000932 0.1004919051982003
+  rotation 0.9999999440803928 9.77834774415035e-09 -0.0003344237002283645 5.5425304452648095e-05
+  name "BEER_BOTTLE(2)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_3 ChipsPack {
+  hidden linearVelocity_0 -6.358516581250514e-18 3.3351127842555595e-18 -3.375077994860477e-16
+  hidden angularVelocity_0 -3.198721824993722e-16 -2.9671885352284117e-16 5.639686261886609e-17
+  translation -11.569700619186117 4.560000783688122 0.11748038000000002
+  rotation -6.902355388497626e-10 -8.040423599117434e-10 -1 1.853553532189099e-08
+  mass 0.1
+}
+DEF PRODUCT_CUBE_3 ChipsPack {
+  hidden linearVelocity_0 3.0116638294612813e-18 -2.0731257432590148e-18 1.0480505352461477e-15
+  hidden angularVelocity_0 3.198721774286892e-16 -2.967188433814738e-16 -3.1996706189455256e-17
+  translation -11.5697 4.56 0.4994803799999999
+  rotation 1.3811197519638484e-10 4.76606285807856e-10 -1 1.8535535435600135e-08
+  name "CHIPS(3)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_4 ChipsPack {
+  hidden linearVelocity_0 8.958003690179889e-18 -1.1062195486570878e-18 -3.3750779948604764e-16
+  hidden angularVelocity_0 5.070683225762775e-24 5.93437696904315e-16 3.0374408534430756e-17
+  translation -11.569700619186117 4.3300007836881225 0.11748038000000002
+  rotation 2.761582094094644e-10 -6.759774597898656e-10 -1 1.853553543198927e-08
+  name "CHIPS(1)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_4 ChipsPack {
+  hidden linearVelocity_0 -9.798359640296756e-18 8.137042235595585e-18 1.0125233984581429e-15
+  hidden angularVelocity_0 3.198721799640305e-16 5.070683548025727e-24 2.413075430534009e-17
+  translation -11.5697 4.33 0.4994803799999999
+  rotation 6.903319637897424e-10 6.046711707171537e-10 -1 1.853553543583506e-08
+  name "CHIPS(4)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_4 ChipsPack {
+  hidden linearVelocity_0 3.7324752947478014e-18 3.497083548633817e-18 3.1086244689504383e-15
+  hidden angularVelocity_0 -3.198721799640307e-16 -5.0706836123289634e-24 -9.303205536814278e-18
+  translation -11.5697 4.33 0.8324803799999998
+  rotation 5.522740458903817e-10 -1.6371800472840435e-10 -1 1.8535535435849484e-08
+  name "CHIPS(7)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_5 ChipsPack {
+  hidden linearVelocity_0 -2.8301335363682718e-18 1.3759487846952021e-17 -2.486899575160351e-16
+  hidden angularVelocity_0 -9.596165398920925e-16 -1.5212050033168754e-23 -2.5988626497168757e-17
+  translation -11.569700619186117 4.110000783688122 0.11748038000000002
+  rotation 2.766123564531491e-10 -4.1984881785029394e-10 -1 1.853553543747372e-08
+  name "CHIPS(2)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_5 ChipsPack {
+  hidden linearVelocity_0 3.355003673062002e-18 -2.8240988009075305e-18 1.0302869668521454e-15
+  hidden angularVelocity_0 3.198721875700554e-16 8.901565504271564e-16 -7.152285733014366e-17
+  translation -11.5697 4.11 0.4994803799999999
+  rotation -2.208430174354347e-09 -2.212756948205687e-09 -0.9999999999999999 1.8535535436285054e-08
+  name "CHIPS(5)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_5 ChipsPack {
+  hidden linearVelocity_0 4.796098477848475e-18 -1.9121495199528843e-18 3.1086244689504383e-15
+  hidden angularVelocity_0 6.397443599280611e-16 1.01413669292512e-23 1.4725322595283038e-17
+  translation -11.5697 4.11 0.8324803799999998
+  rotation -6.897930704438801e-10 -2.2127569070193074e-09 -1 1.8535535461735545e-08
+  name "CHIPS(6)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_6 CheeseWedge {
+  hidden linearVelocity_0 1.4024592761966726e-17 -9.2814291665688e-18 -1.9539925233402755e-16
+  hidden angularVelocity_0 5.460108257875256e-16 6.28427878247674e-16 -5.409798007310808e-17
+  translation -11.568711347684816 6.310001103566067 0.12498038
+  rotation 3.834901227834329e-11 -1.0453390462948793e-11 -1 1.0737796274480263e-06
+  mass 0.1
+}
+DEF PRODUCT_CUBE_6 CheeseWedge {
+  hidden linearVelocity_0 -1.0775416686114638e-18 3.9996548679037686e-17 2.255973186038318e-15
+  hidden angularVelocity_0 -1.91103963255056e-15 8.711471150261583e-22 4.6575679170768076e-17
+  translation -11.5687 6.31 0.5069803799999998
+  rotation -5.114606707665316e-11 -1.0453397718885046e-11 -1 1.0737796271134407e-06
+  name "CHEESE(3)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_7 CheeseWedge {
+  hidden linearVelocity_0 -8.635991800693018e-18 7.533506692464553e-18 -1.776356839400249e-16
+  hidden angularVelocity_0 2.7300617135875643e-16 -6.284282545383309e-16 -9.083868577260766e-17
+  translation -11.56878450966515 6.080001104710461 0.12498038000000002
+  rotation 3.6461442584161244e-11 1.0812284949822208e-11 -1 1.0991627437990808e-06
+  name "CHEESE(1)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_7 CheeseWedge {
+  hidden linearVelocity_0 -1.409275861116198e-17 2.8777100325298005e-17 2.3270274596143282e-15
+  hidden angularVelocity_0 -1.365027799398832e-15 -6.284274901895941e-16 1.5557633088912325e-16
+  translation -11.5688 6.08 0.5069803799999998
+  rotation -7.252742223030368e-12 1.5386149066623525e-11 -1 1.099162743724161e-06
+  name "CHEESE(4)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_7 CheeseWedge {
+  hidden linearVelocity_0 2.576327816468209e-17 -1.3832149080029516e-17 2.3092638912203257e-15
+  hidden angularVelocity_0 2.730054070100196e-16 3.142139361819815e-16 8.556188589489521e-17
+  translation -11.5688 6.08 0.8399803799999999
+  rotation 2.0565408758389047e-11 -1.205705508024887e-11 -1 1.0991627437133513e-06
+  name "CHEESE(6)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_8 CheeseWedge {
+  hidden linearVelocity_0 -6.0466811264285945e-18 2.2127017007271786e-19 -1.953992523340275e-16
+  hidden angularVelocity_0 0 -9.860761315262648e-32 3.8517094412000967e-17
+  translation -11.568854490689795 5.860001105805095 0.12498038000000002
+  rotation -2.2604813793738435e-11 1.7964562130664162e-11 -1 1.1234429370963397e-06
+  name "CHEESE(2)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_8 CheeseWedge {
+  hidden linearVelocity_0 3.601101704436884e-18 3.2380495496922755e-17 2.3270274596143282e-15
+  hidden angularVelocity_0 -1.3650283089646253e-15 6.510274864788581e-22 -5.783244750680264e-18
+  translation -11.5689 5.86 0.8399803799999999
+  rotation 1.6276471980135303e-11 1.7964565428326655e-11 -1 1.1234429370343393e-06
+  name "CHEESE(5)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_8 CheeseWedge {
+  hidden linearVelocity_0 1.3801126079259295e-18 -9.500894544429155e-18 2.3092638912203257e-15
+  hidden angularVelocity_0 2.730059222039199e-16 -3.142141937789473e-16 -8.469643458736702e-17
+  translation -11.5689 5.86 0.5069803799999998
+  rotation 4.349338446697665e-11 9.014535915915688e-12 -1 1.1234429370519798e-06
+  name "CHEESE(7)"
+  mass 0.1
+}
+DEF PRODUCT_CUBE_9 MilkCarton {
+  hidden linearVelocity_0 -5.128826102475395e-18 -4.9809262858619304e-17 6.039613253960851e-16
+  hidden angularVelocity_0 9.431983218054434e-16 -2.465190328815662e-31 -1.4100147752165453e-16
+  translation -11.569699999997416 8.150016007695953 0.15498037999999995
+  rotation -2.005837534857327e-09 -8.967861693750466e-10 -1 1.8535535065832928e-08
+}
+DEF PRODUCT_CUBE_9 MilkCarton {
+  hidden linearVelocity_0 1.659780898620188e-17 -8.350024297076085e-17 2.0072832285222832e-15
+  hidden angularVelocity_0 1.5326972729338466e-15 4.715991609027215e-16 2.458713526384918e-17
+  translation -11.5697 8.15002000000004 0.5369803799999998
+  rotation -1.2425482821746572e-09 6.806783019703769e-10 -1 1.853553518830324e-08
+  name "MILK(3)"
+}
+DEF PRODUCT_CUBE_10 MilkCarton {
+  hidden linearVelocity_0 -2.0198845858588683e-17 -3.3410690777222276e-17 3.3573144264664736e-15
+  hidden angularVelocity_0 7.073987413540826e-16 -4.71599160902722e-16 8.814791414907456e-17
+  translation -11.569700000009702 7.9402599732157135 0.5369803799999997
+  rotation 8.448319880570105e-10 9.35101339272376e-10 -1 1.853553531909815e-08
+  name "MILK(1)"
+}
+DEF PRODUCT_CUBE_10 MilkCarton {
+  hidden linearVelocity_0 1.8944379224176796e-17 3.422950191099961e-17 3.375077994860476e-15
+  hidden angularVelocity_0 -1.1789979022568037e-15 3.5369937067704137e-16 -1.0976040837897535e-16
+  translation -11.5697 7.940260000000043 0.8699803799999998
+  rotation 1.2519208884759332e-09 9.351012562210072e-10 -1 1.8535535153923097e-08
+  name "MILK(7)"
+}
+DEF PRODUCT_CUBE_10 MilkCarton {
+  hidden linearVelocity_0 2.0151810815861012e-17 2.2802262934030988e-18 5.861977570020825e-16
+  hidden angularVelocity_0 1.178997902256798e-16 4.715991609027216e-16 2.36361295797758e-19
+  translation -11.5697 7.940260000000042 0.15498037999999995
+  rotation 1.4554646546582694e-09 2.1563640314429857e-09 -1 1.8535535458137812e-08
+  name "MILK(4)"
+}
+DEF PRODUCT_CUBE_11 MilkCarton {
+  hidden linearVelocity_0 -6.859504298760354e-18 -2.808749284402085e-17 6.927791673660977e-16
+  hidden angularVelocity_0 5.894989511284014e-16 -2.357995804513611e-16 -1.2081269722402738e-16
+  translation -11.569699999391307 7.65050022877381 0.15498037999999995
+  rotation 1.906569286259885e-09 -2.1180502023330123e-09 -1 1.8535535372966102e-08
+  name "MILK(2)"
+}
+DEF PRODUCT_CUBE_11 MilkCarton {
+  hidden linearVelocity_0 -2.5370357577501433e-17 -1.0943846127098053e-18 3.3573144264664736e-15
+  hidden angularVelocity_0 1.1789979022568102e-16 -5.894989511284014e-16 5.71037353319574e-17
+  translation -11.5697 7.650500000000042 0.5369803799999997
+  rotation 1.1941659702460189e-09 1.2093158075390704e-10 -1 1.8535535350037688e-08
+  name "MILK(5)"
+}
+DEF PRODUCT_CUBE_11 MilkCarton {
+  hidden linearVelocity_0 1.062737340747499e-17 -6.169976763328223e-18 3.3573144264664736e-15
+  hidden angularVelocity_0 1.1789979022567993e-16 -1.1789979022568003e-16 1.2343876355374927e-16
+  translation -11.5697 7.650500000000042 0.8699803799999998
+  rotation 1.0923940893748825e-09 -4.896998239676239e-10 -1 1.8535535127634444e-08
+  name "MILK(6)"
+}
+DEF SPAWNED_BOX_2 CardboardBox {
+  hidden linearVelocity_0 1.6014163816691075e-08 1.3039534998426924e-07 1.4748954768606383e-09
+  hidden angularVelocity_0 -1.2937652382749597e-07 -2.618057452809243e-07 -2.8975082897675357e-05
+  translation -10.49007547279935 1.829937423062036 0.16998036245530154
+  rotation 1.4118228853976363e-06 3.928676904633725e-06 0.9999999999912861 3.118065629308495
+  name "SPAWNED_BOX(2)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_3 CardboardBox {
+  hidden linearVelocity_0 2.2037196343733216e-16 1.0337843039898854e-16 8.171241461241163e-16
+  hidden angularVelocity_0 -1.99840144432525e-15 4.662936703425183e-15 7.656304469687278e-17
+  translation -10.356022682674299 1.8247765845071353 0.16998038000000001
+  rotation 0.7067749638235356 0.03063169966685676 0.7067749638235354 -3.080348404646056
+  name "SPAWNED_BOX(3)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_3 CardboardBox {
+  translation 0.66057 0.577028 0.203743
+  rotation 0.7055577133089818 -0.027362286767500518 0.7081240134701363 3.085830855331557
+  name "SPAWNED_BOX(1)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_4 CardboardBox {
+  hidden linearVelocity_0 -9.279258839844926e-07 3.5456167577496714e-08 9.005154311125807e-10
+  hidden angularVelocity_0 4.898043269307986e-07 1.2519341319960917e-05 -1.49641751064633e-05
+  translation -10.59241689322355 1.8295872900701242 0.16998036957453136
+  rotation -6.248201485831635e-05 2.3654036861561555e-06 0.9999999980452012 3.140120556777701
+  name "SPAWNED_BOX(4)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_5 CardboardBox {
+  hidden linearVelocity_0 1.8845031803937927e-08 7.209923453932452e-07 -6.910226879597303e-10
+  hidden angularVelocity_0 1.6674859223908535e-05 -3.729770289284669e-07 1.5316611037735625e-05
+  translation -10.496853409777854 1.9308777369919443 0.1699803875508442
+  rotation 2.8453752490901e-07 8.489863396852691e-05 0.9999999963960704 3.102382566202422
+  name "SPAWNED_BOX(5)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_6 CardboardBox {
+  hidden linearVelocity_0 8.918155453915832e-07 -8.857421493739527e-07 -1.2377212854630666e-09
+  hidden angularVelocity_0 -1.7055310051224463e-05 -1.1907528766055475e-05 1.3760504455895268e-06
+  translation -10.49443015459295 1.7292970100277492 0.1699803981198448
+  rotation 6.1018834144310764e-05 -9.024487654292723e-05 0.999999994066282 3.1027344706172997
+  name "SPAWNED_BOX(6)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_7 CardboardBox {
+  hidden linearVelocity_0 2.8515585892563423e-10 7.337453770506208e-07 7.056705797481297e-10
+  hidden angularVelocity_0 1.0525904130809227e-05 1.2060533571833784e-08 -1.2193648585637202e-05
+  translation -10.49536184113725 3.5050636475941066 0.1999803721927539
+  rotation -3.500409865057019e-08 4.9065520341736575e-05 0.9999999987962869 -3.139888785261699
+  name "SPAWNED_BOX(7)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_8 CardboardBox {
+  hidden linearVelocity_0 -4.2785934202013693e-17 1.1035572951437112e-17 8.171241461241152e-16
+  hidden angularVelocity_0 -4.996003610813202e-16 -4.996003610813236e-16 5.2396876795906864e-17
+  translation -10.35006841155083 3.499822557585059 0.19998038
+  rotation 0.7071064939437474 -0.0009013573998794275 0.7071064939437475 3.1397899392782365
+  name "SPAWNED_BOX(8)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_9 CardboardBox {
+  hidden linearVelocity_0 -7.024336250704977e-07 1.887180723914029e-09 1.1651722076067015e-09
+  hidden angularVelocity_0 1.6522522683359866e-08 9.20493161310488e-06 -1.0603837294564933e-05
+  translation -10.595579302710188 3.5000364428892805 0.199980370972439
+  rotation -4.047892396457204e-05 2.6869153651346376e-08 0.9999999991807279 3.1389645785292726
+  name "SPAWNED_BOX(9)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_10 CardboardBox {
+  hidden linearVelocity_0 7.90118475396557e-17 -1.6253281318417016e-17 4.973799150320702e-16
+  hidden angularVelocity_0 3.3306690738754617e-16 1.332267629550187e-15 8.840290611437547e-17
+  translation -10.488739268468331 3.7246416845683186 0.19998038
+  rotation -0.0015351198948457862 0.9999988217027601 -4.661048543359851e-18 3.141592653589793
+  name "SPAWNED_BOX(10)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_11 CardboardBox {
+  hidden linearVelocity_0 6.998174250152158e-07 -7.322678220841872e-07 -1.6915670641992615e-09
+  hidden angularVelocity_0 -1.0608803791462113e-05 -9.264881035872748e-06 6.825256192721784e-07
+  translation -10.495656495206628 3.4050550127928774 0.19998039601962497
+  rotation 4.070916444436149e-05 -4.948485844673826e-05 0.9999999979470066 -3.140447149660544
+  name "SPAWNED_BOX(11)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_12 CardboardBox {
+  hidden linearVelocity_0 2.8515587113808754e-10 7.337453804523443e-07 7.056705442209932e-10
+  hidden angularVelocity_0 1.0525904069358386e-05 1.2060534571034509e-08 -1.219364858746907e-05
+  translation -10.51536184113725 5.2750636475941075 0.1999803721927539
+  rotation -3.5004098665955804e-08 4.9065520343983374e-05 0.9999999987962869 -3.1398887852617063
+  name "SPAWNED_BOX(12)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_13 CardboardBox {
+  hidden linearVelocity_0 2.6330151601590324e-18 3.1220858638909506e-18 7.815970093361102e-16
+  hidden angularVelocity_0 -1.665334536937734e-16 1.6653345369376717e-16 -1.5270380454275677e-16
+  translation -10.370068411550829 5.269822557585061 0.19998038
+  rotation 0.7071064939437474 -0.0009013573998794141 0.7071064939437475 3.1397899392782365
+  name "SPAWNED_BOX(13)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_14 CardboardBox {
+  hidden linearVelocity_0 -7.024336249417115e-07 1.887180656190425e-09 1.165172207606701e-09
+  hidden angularVelocity_0 1.6522523349493677e-08 9.204931614270613e-06 -1.0603837292899597e-05
+  translation -10.615579302710186 5.270036442889291 0.199980370972439
+  rotation -4.047892396294007e-05 2.6869153652419656e-08 0.9999999991807279 3.138964578529276
+  name "SPAWNED_BOX(14)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_15 CardboardBox {
+  hidden linearVelocity_0 1.0986002782416062e-16 1.0102587710142015e-17 5.329070518200752e-16
+  hidden angularVelocity_0 -6.661338147750928e-16 2.1649348980190553e-15 -1.3767686399298124e-17
+  translation -10.50873926846833 5.494641684568323 0.19998038
+  rotation -0.0015351198948467372 0.9999988217027601 4.591549788258994e-18 3.141592653589793
+  name "SPAWNED_BOX(15)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_16 CardboardBox {
+  hidden linearVelocity_0 6.998174249344596e-07 -7.322678252909277e-07 -1.6915671707806715e-09
+  hidden angularVelocity_0 -1.0608803733064653e-05 -9.264881034746697e-06 6.825256204379124e-07
+  translation -10.515656495206624 5.175055012792882 0.19998039601962497
+  rotation 4.070916444276257e-05 -4.9484858449013374e-05 0.9999999979470066 -3.140447149660524
+  name "SPAWNED_BOX(16)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_17 CardboardBox {
+  hidden linearVelocity_0 1.2221428973295441e-09 8.845812354518755e-07 -1.6215665787910895e-09
+  hidden angularVelocity_0 1.1852860173855444e-05 -3.903085987744246e-08 5.861206245350023e-08
+  translation -10.509999801361154 7.147845708751847 0.20998039011339545
+  rotation 7.58927138753518e-08 3.98820327805315e-05 0.999999999204709 3.1390498031309813
+  name "SPAWNED_BOX(17)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_18 CardboardBox {
+  hidden linearVelocity_0 -4.897559653291234e-17 -1.6854851832029755e-17 5.684341886080803e-16
+  hidden angularVelocity_0 3.3306690738754706e-16 -1.165734175856414e-15 -8.865185024247474e-17
+  translation -10.376792805848524 7.13985682422875 0.20998038
+  rotation 0.7071064958092208 -0.0008984257391574903 0.7071064958092208 3.139795802594932
+  name "SPAWNED_BOX(18)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_19 CardboardBox {
+  hidden linearVelocity_0 -2.7606821057453454e-16 -2.1715962978900524e-17 7.105427357601002e-16
+  hidden angularVelocity_0 4.996003610813194e-16 -5.329070518200749e-15 5.562838695064394e-17
+  translation -10.712938115976815 7.119028709210069 0.20998037999999997
+  rotation -0.7063067488833124 0.047555787910311696 0.7063067488833127 3.0465526805895062
+  name "SPAWNED_BOX(19)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_20 CardboardBox {
+  hidden linearVelocity_0 5.55452261101626e-17 -2.5205987378552857e-17 7.105427357601002e-16
+  hidden angularVelocity_0 1.6653345369377348e-16 1.332267629550187e-15 1.206784192592957e-17
+  translation -10.500929581379191 7.356152728097209 0.20998037999999997
+  rotation 0.02579540194458134 0.9996672432557333 5.8153771698385754e-18 3.141592653589793
+  name "SPAWNED_BOX(20)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+DEF SPAWNED_BOX_21 CardboardBox {
+  hidden linearVelocity_0 -1.2227609727522017e-09 -8.879175243103889e-07 1.7157113418875278e-09
+  hidden angularVelocity_0 -1.178613438079789e-05 3.9023642225185335e-08 -5.751001175280378e-09
+  translation -10.510035721628254 7.047857408453639 0.20998036957013233
+  rotation -7.611174880550029e-08 -3.967659251875079e-05 0.9999999992128811 3.139050324495171
+  name "SPAWNED_BOX(21)"
+  size 0.1 0.1 0.1
+  mass 0.1
+}

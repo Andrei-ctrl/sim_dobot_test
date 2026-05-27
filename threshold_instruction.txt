@@ -1,0 +1,287 @@
+================================================================================
+THRESHOLD TESTING INSTRUCTIONS
+Factory simulation — front shelves (products) and stock pallets
+================================================================================
+
+World file:  worlds/triger_threshold.wbt
+Dashboard:   python dashboard_server.py  →  http://127.0.0.1:8000
+
+See also: instruction.txt (overview of all three verification worlds)
+
+This document explains what each threshold means and how to verify it in the
+simulation, the Webots console, JSON data files, and the dashboard.
+
+
+--------------------------------------------------------------------------------
+1. QUICK REFERENCE — RULES IN CODE
+--------------------------------------------------------------------------------
+
+FRONT SHELF (per product: BEER_BOTTLE, CHIPS, CHEESE, MILK)
+  Max capacity     9 items  (3 rows × 3 items per row)
+  Sort trigger     At least 1 full row missing vs baseline
+                   Example: baseline 9 → sort when count is 6 or less
+                   (7 or 8 items = only 1–2 missing → no sort from row rule)
+  Sort blocked     When shelf is full (9/9) or no room for next box (+3 items)
+  Inventory file   data/inventory.json → "threshold": 2 per product
+                   (legacy front_stock field; row-missing rule is primary)
+
+STOCK PALLET (warehouse pallet per product)
+  Max boxes        5  (PALLET_TARGET_BOXES)
+  Reorder when     Below 3 boxes  (PALLET_MIN_BOXES → triggers at 2 or fewer)
+  Replenish to     5 boxes via IPR spawn
+  Spawn timing     First order: immediate
+                   Next orders: after box passes conveyor scanner + 50 s delay
+
+Where constants live (if you change them, restart Webots):
+  controllers/restocking_task_manager.py     PALLET_TARGET_BOXES, PALLET_MIN_BOXES
+  controllers/restocking_task_manager.py     BOTTLES_PER_ROW (= 3)
+  data/inventory.json                        "threshold" per product
+  controllers/shelf_monitoring/              shelf slot grid (max 9 items)
+
+
+--------------------------------------------------------------------------------
+2. BEFORE YOU TEST
+--------------------------------------------------------------------------------
+
+1. Start the dashboard (separate terminal):
+     python dashboard_server.py
+
+2. Open Webots → load worlds/triger_threshold.wbt → Play.
+
+3. Wait ~5–10 s for supervisors to settle:
+     [SHELF MONITORING] Baseline shelf counts
+     [TASK MANAGER] Pallet box sync at t=...
+
+4. Confirm dashboard "Stock & Shelves" panel shows:
+     - Front shelf:  N / 9
+     - Stock pallet: N / 5   (not "- / 5")
+
+5. Useful data files (refresh while sim runs):
+     data/shelf_counts.json      front shelf item counts
+     data/pallet_counts.json     boxes on each stock pallet
+     data/sort_queue.json        pending sort tasks
+     data/spawn_signal.json      IPR spawn orders
+     data/system_state.json      combined snapshot from task manager
+
+
+--------------------------------------------------------------------------------
+3. TEST A — FRONT SHELF FULL (NO SORT)
+--------------------------------------------------------------------------------
+
+Goal: When front shelf is 9/9, no sort task should be created for that product.
+
+Setup:
+  - Use default world (shelves full at start) OR let sim run until counts are 9.
+
+Verify:
+  Dashboard:
+    Product row shows 9 / 9 and Status "Shelf full" (orange).
+
+  Webots console:
+    [STOCK MONITORING] Skip sort — BEER_BOTTLE: front shelf full (9/9) ...
+
+  data/sort_queue.json:
+    No new task for that product.
+
+Pass: No sort queued while front shelf stays at 9/9.
+
+
+--------------------------------------------------------------------------------
+4. TEST B — FRONT SHELF ROW MISSING (SORT TRIGGERED)
+--------------------------------------------------------------------------------
+
+Goal: Removing one full row (3 items) from a front shelf should allow/trigger
+      a sort from the matching stock pallet.
+
+Setup (manual in Webots):
+  1. Pause simulation.
+  2. In the scene tree, find front-shelf products for one product (e.g. CHEESE
+     on the cheese section shelf around x ≈ -11.57).
+  3. Delete or move 3 items (one row) so shelf count drops from 9 → 6.
+  4. Resume simulation.
+
+Verify:
+  data/shelf_counts.json:
+    "CHEESE": 6  (updates within a few seconds)
+
+  Dashboard:
+    CHEESE front shelf shows 6 / 9.
+
+  Webots console (one or more of):
+    [TASK MANAGER] ... sort ... CHEESE ... row gap ...
+    [STOCK MONITORING] Stock updated on CHEESE_STOCK: ... sort seq=...
+
+  data/sort_queue.json:
+    New entry with "product_id": "CHEESE", "task_type": "stock_pallet".
+
+  youBot sorter:
+    [YOUBOT SORTER] ... picks task and navigates to CHEESE_STOCK.
+
+Pass: Sort task appears when count ≤ 6 (with baseline 9), sorter runs when
+      boxes exist on CHEESE_STOCK and shelf has room.
+
+Note — boundary check:
+  - 8 items on shelf (1–2 missing): row rule does NOT fire (need 3+ missing).
+  - 6 items (3 missing): row rule fires.
+
+
+--------------------------------------------------------------------------------
+5. TEST C — FRONT SHELF CAPACITY BLOCKS SORT
+--------------------------------------------------------------------------------
+
+Goal: Even if a box sits on the stock pallet, sort is skipped when the front
+      shelf cannot fit another box (+3 items).
+
+Setup:
+  - Front shelf at 8/9 or 9/9 for a product.
+  - Box present on that product's stock pallet.
+
+Verify:
+  [STOCK MONITORING] Skip sort — ... front shelf full (9/9) ...
+  OR
+  ... no room for 3 items (8/9) ...
+
+Pass: No sort_queue entry until at least 3 free slots exist on front shelf.
+
+
+--------------------------------------------------------------------------------
+6. TEST D — STOCK PALLET FULL (NO IPR REORDER)
+--------------------------------------------------------------------------------
+
+Goal: When a stock pallet has 5 boxes, task manager does not order more spawns.
+
+Setup:
+  - Ensure pallet has 5 boxes (default world often has 4–6 per product).
+  - Check dashboard Stock pallet column: 5 / 5.
+
+Verify:
+  Console: no new lines like
+    [TASK MANAGER] IPR spawn request ... replenish to 5
+  for that product while count stays at 5.
+
+  data/spawn_signal.json:
+    No new seq for that product.
+
+Pass: No spawn orders at 5/5.
+
+
+--------------------------------------------------------------------------------
+7. TEST E — STOCK PALLET LOW (IPR REORDER)
+--------------------------------------------------------------------------------
+
+Goal: When boxes on a stock pallet drop below 3, IPR should be asked to spawn
+      replacements until the pallet reaches 5 boxes.
+
+Setup (manual in Webots):
+  1. Pause simulation.
+  2. Find boxes on one stock pallet (e.g. CHEESE_STOCK, DEF CHEESE_STOCK).
+  3. Delete boxes until only 2 remain on that pallet.
+  4. Resume simulation.
+  5. Wait for pallet sync (~6 s after reload, or a few seconds after edit).
+
+Verify:
+  Dashboard:
+    CHEESE Stock pallet: 2 / 5
+    Status: "Reorder pallet" (red).
+
+  data/pallet_counts.json:
+    "CHEESE": 2
+
+  Webots console:
+    [TASK MANAGER] Pallet box sync at t=... {'CHEESE_STOCK': 2, ...}
+    [TASK MANAGER] IPR spawn request ... CHEESE ... pallet stock 2/5 (replenish to 5)
+    [BOX SPAWNER] Task manager ordered CHEESE; spawning immediately
+      (first spawn after reload)
+
+  data/spawn_signal.json:
+    New entry with product_id and incremented seq.
+
+  IPR:
+    Spawns SPAWNED_BOX_N at the IPR spawn pad (~8.93, 1.15, 0.19).
+
+Pass: Spawn signal issued when count < 3; count eventually climbs toward 5.
+
+Note — boundary check:
+  - 3 boxes on pallet: OK, no reorder (at minimum acceptable level).
+  - 2 boxes: reorder triggered.
+
+
+--------------------------------------------------------------------------------
+8. TEST F — SPAWN COOLDOWN (SECOND+ BOX ON SAME PALLET)
+--------------------------------------------------------------------------------
+
+Goal: After the first IPR spawn, the next spawn for the same product waits until
+      the previous box is scanned on the upstream conveyor, then 50 s more.
+
+Verify (after Test E spawned one box):
+  1. Box travels on conveyor; scanner logs:
+       [SCANNER] Product entered upstream conveyor scanner zone ...
+       [TASK MANAGER] Conveyor scan recorded for ... next spawn allowed after 50s
+
+  2. Before 50 s elapsed: no second spawn_signal for same product.
+
+  3. After delay: next [TASK MANAGER] IPR spawn request if pallet still < 5.
+
+Pass: Second spawn respects scanner + 50 s gate (see SPAWN_DELAY_SEC in
+      controllers/youbot_restocker_demo/youbot_restocker_logic.py).
+
+
+--------------------------------------------------------------------------------
+9. TEST G — INVENTORY THRESHOLD (data/inventory.json)
+--------------------------------------------------------------------------------
+
+Goal: Each product has "threshold": 2 in data/inventory.json (front_stock units
+      in the file, not raw shelf item count).
+
+Current behaviour:
+  - Task manager primarily uses the shelf ROW rule (section 4), not threshold
+    alone.
+  - Threshold-only restock is deferred in code when no row is missing.
+
+To inspect threshold logic:
+  1. Edit data/inventory.json → set "threshold": 5 for MILK (example).
+  2. Restart sim.
+  3. Watch [TASK MANAGER] reasons in console; row gap still dominates sort tasks.
+
+For unit-level threshold checks without Webots:
+     python -m unittest controllers.test_restocking_task_manager -v
+
+Pass: Tests inventory_needs_restock / shelf_needs_restock match expectations.
+
+
+--------------------------------------------------------------------------------
+10. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+Dashboard shows "- / 5" for stock pallet:
+  - stock_monitoring or restocking_task_manager_demo not running.
+  - Check data/pallet_counts.json exists and has "counts".
+  - Restart dashboard_server.py after code updates.
+
+No sort tasks at 6/9 front shelf:
+  - shelf_monitoring baseline not locked yet — wait for baseline log.
+  - No labeled box on stock pallet (box needs routing in data/box_routing.json).
+  - Sort task already pending — check data/sort_queue.json.
+
+False spawn orders on world reload:
+  - Wait for [TASK MANAGER] Pallet box sync before judging counts.
+  - Stale spawn_signal cleared on new sim run id.
+
+Motor limit warnings at startup:
+  - Harmless float noise from saved joint positions; controllers clamp on first step.
+
+
+--------------------------------------------------------------------------------
+11. SUMMARY CHECKLIST
+--------------------------------------------------------------------------------
+
+[ ] Dashboard running at http://127.0.0.1:8000
+[ ] Front shelf 9/9 → no sort (Test A)
+[ ] Front shelf 6/9 → sort queued (Test B)
+[ ] Front shelf 8–9/9 → sort blocked from pallet (Test C)
+[ ] Stock pallet 5/5 → no IPR order (Test D)
+[ ] Stock pallet 2/5 → IPR reorder (Test E)
+[ ] Second spawn waits for scanner + 50 s (Test F)
+[ ] inventory.json threshold understood / unit tests pass (Test G)
+
+================================================================================

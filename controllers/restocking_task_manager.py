@@ -6,6 +6,7 @@ import os
 import sys
 
 import product_routing
+import sim_session
 
 _SHELF_MON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shelf_monitoring")
 if _SHELF_MON_DIR not in sys.path:
@@ -32,8 +33,12 @@ MAX_CUBE_SCAN = 40
 MAX_BOX_SCAN = 100
 DEFAULT_THRESHOLD = 2
 RESTOCK_COOLDOWN_SEC = 12.0
+FAILED_SORT_COOLDOWN_SEC = 30.0
 PALLET_TARGET_BOXES = 5
 PALLET_MIN_BOXES = 3
+PALLET_MONITOR_WARMUP_SEC = 3.0
+
+TERMINAL_SORT_STATUSES = frozenset({"done", "skipped_full", "failed"})
 
 try:
     _RESTOCKER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "youbot_restocker_demo")
@@ -50,6 +55,11 @@ try:
     import spawn_signal
 except ImportError:
     spawn_signal = None
+
+try:
+    import conveyor_scan_signal
+except ImportError:
+    conveyor_scan_signal = None
 
 
 def data_dir(project_root):
@@ -70,6 +80,32 @@ def restock_queue_path(project_root):
 
 def system_state_path(project_root):
     return os.path.join(data_dir(project_root), SYSTEM_STATE_FILENAME)
+
+
+PALLET_COUNTS_FILENAME = "pallet_counts.json"
+
+
+def pallet_counts_path(project_root):
+    return os.path.join(data_dir(project_root), PALLET_COUNTS_FILENAME)
+
+
+def stock_rules_payload():
+    return {
+        "pallet_target": PALLET_TARGET_BOXES,
+        "pallet_reorder_below": PALLET_MIN_BOXES,
+    }
+
+
+def save_pallet_counts(project_root, counts, sim_time, source=""):
+    save_json(
+        pallet_counts_path(project_root),
+        {
+            "sim_time": sim_time,
+            "source": source,
+            "counts": counts,
+            "stock_rules": stock_rules_payload(),
+        },
+    )
 
 
 def load_json(path, default=None):
@@ -195,7 +231,9 @@ def find_box_on_pallet(get_from_def, pallet_def):
         node = get_from_def(box_def)
         if node is None:
             continue
-        pos = node.getField("translation").getSFVec3f()
+        pos = product_routing.node_world_xyz(node)
+        if pos is None:
+            continue
         if product_routing.box_on_pallet(pos, pallet_def):
             return box_def
     return ""
@@ -209,10 +247,50 @@ def count_boxes_on_pallet(get_from_def, pallet_def):
         node = get_from_def(box_def)
         if node is None:
             continue
-        pos = node.getField("translation").getSFVec3f()
+        pos = product_routing.node_world_xyz(node)
+        if pos is None:
+            continue
         if product_routing.box_on_pallet(pos, pallet_def):
             count += 1
     return count
+
+
+def verify_restock_increase(get_from_def, pallet_def, count_before, expected=1):
+    """True when a restock cycle increased the target pallet box count."""
+    count_after = count_boxes_on_pallet(get_from_def, pallet_def)
+    delta = count_after - int(count_before)
+    return delta >= expected, count_after, delta
+
+
+def box_delivered_to_pallet(get_from_def, box_def, pallet_def):
+    """Check the spawned box exists and sits on the routed stock pallet."""
+    if not box_def:
+        return False, "missing_box_def"
+    node = get_from_def(box_def)
+    if node is None:
+        return False, "box_removed"
+    pos = product_routing.node_world_xyz(node)
+    if pos is None:
+        return False, "no_position"
+    if not product_routing.box_on_pallet(pos, pallet_def):
+        return False, "not_on_pallet"
+    return True, "ok"
+
+
+def list_boxes_on_pallet(get_from_def, pallet_def):
+    prefix = product_routing.BOX_DEF_PREFIX
+    found = []
+    for index in range(MAX_BOX_SCAN):
+        box_def = f"{prefix}{index}"
+        node = get_from_def(box_def)
+        if node is None:
+            continue
+        pos = product_routing.node_world_xyz(node)
+        if pos is None:
+            continue
+        if product_routing.box_on_pallet(pos, pallet_def):
+            found.append(box_def)
+    return found
 
 
 def count_boxes_for_product(get_from_def, product_id):
@@ -227,9 +305,104 @@ def count_all_pallet_boxes(get_from_def):
     }
 
 
+def pallet_counts_by_product(get_from_def):
+    """Live box counts on stock pallets keyed by product_id (for dashboard)."""
+    return {
+        product_routing.route_for_pallet_def(pallet_def)["product_id"]: count
+        for pallet_def, count in count_all_pallet_boxes(get_from_def).items()
+    }
+
+
 def pallet_spawn_cooldown_elapsed(state, product_id, sim_time):
-    last = float((state.get("last_pallet_spawn_time") or {}).get(product_id, -1e9))
-    return (sim_time - last) >= SPAWN_ORDER_COOLDOWN_SEC
+    """Next pallet order only after previous box hit the conveyor scanner + delay."""
+    awaiting = (state.get("awaiting_conveyor_scan") or {}).get(product_id)
+    if awaiting:
+        return False
+
+    last_scan = (state.get("last_pallet_scan_time") or {}).get(product_id)
+    if last_scan is None:
+        return True
+
+    return (sim_time - float(last_scan)) >= SPAWN_ORDER_COOLDOWN_SEC
+
+
+def process_conveyor_scans(project_root, state, sim_time):
+    """Record upstream scanner hits to gate the next pallet replenishment order."""
+    if conveyor_scan_signal is None:
+        return state
+
+    signal = conveyor_scan_signal.read_scan(project_root)
+    if not signal:
+        return state
+
+    seq = int(signal.get("seq", 0))
+    last_processed = int(state.get("last_conveyor_scan_seq", 0))
+    if seq <= last_processed:
+        return state
+
+    if not sim_session.signal_for_current_run(signal, project_root):
+        return state
+
+    product_id = (signal.get("product_id") or "").strip()
+    box_def = signal.get("box_def") or "?"
+    if not product_id:
+        return state
+
+    state["last_conveyor_scan_seq"] = seq
+    awaiting = state.setdefault("awaiting_conveyor_scan", {})
+    if awaiting.get(product_id):
+        awaiting[product_id] = False
+    state.setdefault("last_pallet_scan_time", {})[product_id] = float(
+        signal.get("t", sim_time)
+    )
+    print(
+        f"[TASK MANAGER] Conveyor scan recorded for {product_id} "
+        f"({box_def}) — next spawn allowed after "
+        f"{SPAWN_ORDER_COOLDOWN_SEC:.0f}s"
+    )
+    return state
+
+
+def sync_pallet_stock_state(get_from_def, state):
+    """
+    Reconcile persisted pallet-replenish flags with boxes currently in the scene.
+    Clears stale replenish targets left over from a previous Webots session when
+    the saved world already has enough boxes on stock pallets.
+    """
+    if get_from_def is None:
+        return state
+
+    ever_full = state.setdefault("pallet_ever_full", {})
+    replenish = state.setdefault("pallet_replenish_target", {})
+    last_spawn = state.setdefault("last_pallet_spawn_time", {})
+
+    for product_id in iter_product_ids():
+        route = product_routing.route_for_product_id(product_id)
+        count = count_boxes_on_pallet(get_from_def, route["def"])
+
+        if count >= PALLET_TARGET_BOXES:
+            ever_full[product_id] = True
+            replenish.pop(product_id, None)
+            last_spawn.pop(product_id, None)
+            state.setdefault("awaiting_conveyor_scan", {}).pop(product_id, None)
+            state.setdefault("last_pallet_scan_time", {}).pop(product_id, None)
+            continue
+
+        if count >= PALLET_MIN_BOXES:
+            ever_full[product_id] = True
+            replenish.pop(product_id, None)
+            last_spawn.pop(product_id, None)
+            state.setdefault("awaiting_conveyor_scan", {}).pop(product_id, None)
+            state.setdefault("last_pallet_scan_time", {}).pop(product_id, None)
+            continue
+
+        if count > 0:
+            ever_full[product_id] = True
+            replenish[product_id] = PALLET_TARGET_BOXES
+        else:
+            replenish.pop(product_id, None)
+
+    return state
 
 
 def evaluate_pallet_stock_needs(project_root, get_from_def, sim_time, state):
@@ -238,6 +411,9 @@ def evaluate_pallet_stock_needs(project_root, get_from_def, sim_time, state):
     PALLET_TARGET_BOXES is reached (one spawn request per cooldown interval).
     """
     if get_from_def is None or spawn_signal is None:
+        return []
+
+    if sim_time < PALLET_MONITOR_WARMUP_SEC:
         return []
 
     replenish = state.setdefault("pallet_replenish_target", {})
@@ -252,23 +428,41 @@ def evaluate_pallet_stock_needs(project_root, get_from_def, sim_time, state):
 
         if count >= PALLET_TARGET_BOXES:
             ever_full[product_id] = True
-            if target is not None and count >= target:
-                replenish.pop(product_id, None)
+            replenish.pop(product_id, None)
+            state.setdefault("awaiting_conveyor_scan", {}).pop(product_id, None)
+            state.setdefault("last_pallet_scan_time", {}).pop(product_id, None)
             continue
+
+        if count >= PALLET_MIN_BOXES:
+            ever_full[product_id] = True
+            replenish.pop(product_id, None)
+            state.setdefault("awaiting_conveyor_scan", {}).pop(product_id, None)
+            state.setdefault("last_pallet_scan_time", {}).pop(product_id, None)
+            continue
+
+        if count > 0:
+            ever_full[product_id] = True
 
         if not ever_full.get(product_id):
             continue
 
-        if target is None and count < PALLET_MIN_BOXES:
+        if target is None:
             replenish[product_id] = PALLET_TARGET_BOXES
             target = PALLET_TARGET_BOXES
-        elif target is not None and count >= target:
+
+        if count >= target:
             replenish.pop(product_id, None)
-            continue
-        elif target is None:
             continue
 
         if not pallet_spawn_cooldown_elapsed(state, product_id, sim_time):
+            continue
+
+        pending = spawn_signal.read_signal(project_root)
+        if (
+            pending
+            and pending.get("product_id") == product_id
+            and sim_session.signal_for_current_run(pending, project_root)
+        ):
             continue
 
         actions.append(
@@ -288,6 +482,10 @@ def evaluate_pallet_stock_needs(project_root, get_from_def, sim_time, state):
     return actions
 
 
+def mark_pallet_spawn_ordered(state, product_id):
+    state.setdefault("awaiting_conveyor_scan", {})[product_id] = True
+
+
 def create_spawn_request(project_root, product_id, sim_time, *, reason=""):
     if spawn_signal is None:
         return None
@@ -305,9 +503,82 @@ def has_open_sort_task(project_root, product_id, sort_queue=None):
         sort_queue = sort_signal.read_queue(project_root)
     sort_queue = sort_queue or []
     for task in sort_queue:
-        if task.get("product_id") == product_id and task.get("status", "pending") != "done":
+        if task.get("product_id") != product_id:
+            continue
+        status = task.get("status", "pending")
+        if status not in TERMINAL_SORT_STATUSES:
             return True
     return False
+
+
+def sort_failure_cooldown_active(
+    state, product_id, sim_time, project_root=None, sort_queue=None
+):
+    """Avoid re-ordering sort tasks immediately after a failed run."""
+    last_map = state.setdefault("last_sort_failure_time", {})
+    last_fail = float(last_map.get(product_id, -1e9))
+    if (sim_time - last_fail) < FAILED_SORT_COOLDOWN_SEC:
+        return True
+    if sort_queue is None and sort_signal is not None and project_root is not None:
+        sort_queue = sort_signal.read_queue(project_root)
+    sort_queue = sort_queue or []
+    for task in sort_queue:
+        if task.get("product_id") != product_id or task.get("status") != "failed":
+            continue
+        t_fail = float(task.get("t_failed", task.get("t", 0)))
+        if (sim_time - t_fail) < FAILED_SORT_COOLDOWN_SEC:
+            last_map[product_id] = t_fail
+            return True
+    return False
+
+
+def collect_threshold_events(
+    shelf_counts,
+    baseline_counts,
+    inventory,
+    pallet_counts=None,
+):
+    """Active threshold conditions for dashboard / logs (no side effects)."""
+    events = []
+    pallet_counts = pallet_counts or {}
+    for product_id in iter_product_ids():
+        baseline = int(baseline_counts.get(product_id, 0))
+        current = int(shelf_counts.get(product_id, 0))
+        if baseline > 0 and shelf_needs_restock(baseline, current):
+            events.append(
+                {
+                    "event": "threshold_check",
+                    "kind": "shelf_row_missing",
+                    "product_id": product_id,
+                    "current": current,
+                    "baseline": baseline,
+                    "missing_rows": missing_row_count(baseline, current),
+                }
+            )
+        if inventory_needs_restock(inventory, product_id, shelf_item_count=current):
+            item = inventory.get(product_id) or {}
+            events.append(
+                {
+                    "event": "threshold_check",
+                    "kind": "inventory_front_low",
+                    "product_id": product_id,
+                    "shelf_items": current,
+                    "threshold": int(item.get("threshold", DEFAULT_THRESHOLD)),
+                }
+            )
+        count = int(pallet_counts.get(product_id, 0))
+        if count < PALLET_MIN_BOXES:
+            events.append(
+                {
+                    "event": "threshold_check",
+                    "kind": "pallet_low",
+                    "product_id": product_id,
+                    "count": count,
+                    "reorder_below": PALLET_MIN_BOXES,
+                    "target": PALLET_TARGET_BOXES,
+                }
+            )
+    return events
 
 
 def has_open_restock_task(project_root, product_id, restock_queue=None):
@@ -395,13 +666,28 @@ def evaluate_restock_needs(
     sim_time,
     state,
     get_from_def=None,
+    skip_log=None,
 ):
     """
     Return list of actions: sort and/or pallet restock requests.
     Does not write files — caller applies actions.
+    Optional skip_log list receives dicts when a threshold hit is gated.
     """
     actions = []
     sort_queue = sort_signal.read_queue(project_root) if sort_signal else []
+
+    def log_skip(product_id, kind, reason):
+        if skip_log is None:
+            return
+        skip_log.append(
+            {
+                "event": "threshold_skip",
+                "product_id": product_id,
+                "kind": kind,
+                "reason": reason,
+                "t": sim_time,
+            }
+        )
 
     for product_id in iter_product_ids():
         route = product_routing.route_for_product_id(product_id)
@@ -417,14 +703,23 @@ def evaluate_restock_needs(
 
         if not row_missing and not threshold_hit:
             continue
-        # Threshold-only restock is deferred until shelf-capacity gating is validated.
-        if threshold_hit and not row_missing:
-            continue
         if shelf_mon is not None and not shelf_mon.can_accept_sort(current, product_id):
+            if row_missing or threshold_hit:
+                log_skip(product_id, "front_shelf", f"no room ({current} items)")
             continue
         if has_open_sort_task(project_root, product_id, sort_queue):
+            if row_missing or threshold_hit:
+                log_skip(product_id, "sort_queue", "open sort task pending")
+            continue
+        if sort_failure_cooldown_active(
+            state, product_id, sim_time, project_root, sort_queue
+        ):
+            if row_missing or threshold_hit:
+                log_skip(product_id, "sort_failed", "cooldown after failed sort")
             continue
         if not cooldown_elapsed(state, product_id, sim_time):
+            if row_missing or threshold_hit:
+                log_skip(product_id, "cooldown", "trigger cooldown active")
             continue
 
         box_def = ""
@@ -471,6 +766,10 @@ def build_system_state(
     active_tasks=None,
     robots=None,
     event=None,
+    pallet_counts=None,
+    shelf_capacity=None,
+    threshold_events=None,
+    last_failure=None,
 ):
     sort_queue = sort_signal.read_queue(project_root) if sort_signal else []
     restock_queue = load_restock_queue(project_root)
@@ -488,17 +787,46 @@ def build_system_state(
             "restocker": {"status": "idle", "detail": "youBot restocker"},
             "ipr": {"status": "idle", "detail": "IPR pick arm"},
         },
+        "stock_rules": {
+            "pallet_target": PALLET_TARGET_BOXES,
+            "pallet_reorder_below": PALLET_MIN_BOXES,
+        },
     }
+    if pallet_counts is not None:
+        payload["pallet_counts"] = pallet_counts
+    if shelf_capacity is not None:
+        payload["shelf_capacity"] = shelf_capacity
+    if threshold_events is not None:
+        payload["threshold_events"] = threshold_events
+    failure = last_failure if last_failure is not None else load_last_failure(project_root)
+    if failure:
+        payload["last_failure"] = failure
     if event:
         payload["last_event"] = event
     return payload
+
+
+def load_last_failure(project_root):
+    path = os.path.join(data_dir(project_root), "last_failure.json")
+    return load_json(path, default=None) if os.path.isfile(path) else None
 
 
 def publish_system_state(project_root, payload):
     save_json(system_state_path(project_root), payload)
 
 
-def dashboard_payload(project_root, sim_time, shelf_counts, baseline_counts, inventory, event=None):
+def dashboard_payload(
+    project_root,
+    sim_time,
+    shelf_counts,
+    baseline_counts,
+    inventory,
+    event=None,
+    pallet_counts=None,
+    shelf_capacity=None,
+    threshold_events=None,
+    last_failure=None,
+):
     active = []
     if sort_signal:
         for task in sort_signal.read_queue(project_root)[-5:]:
@@ -530,4 +858,8 @@ def dashboard_payload(project_root, sim_time, shelf_counts, baseline_counts, inv
         inventory,
         active_tasks=active,
         event=event,
+        pallet_counts=pallet_counts,
+        shelf_capacity=shelf_capacity,
+        threshold_events=threshold_events,
+        last_failure=last_failure,
     )

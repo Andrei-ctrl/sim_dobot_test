@@ -1,0 +1,884 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/ThreadMetalPlate.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/computers/protos/Monitor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/valves/protos/LeverValve.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/pallet/protos/WoodenPalletStack.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/CardboardBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Roughcast.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/solids/protos/SolidBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/GalvanizedMetal.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/CorrugatedMetal.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/conveyors/protos/ConveyorBelt.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/pallet/protos/WoodenPallet.proto"
+IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/drinks/protos/BeerBottle.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/ChipsPack.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/MilkCarton.proto"
+IMPORTABLE EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/CheeseWedge.proto"
+EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/YoubotBoxGrip.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/softbank/nao/protos/Shelves.proto"
+EXTERNPROTO "c:/Users/andru/Desktop/sim_dobot_test/protos/IprHd6ms180.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/generic/TruckSimple.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/UnevenTerrain.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Door.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/ParkingLines.proto"
+
+WorldInfo {
+  info [
+    "Universal Robot UR3e, UR5e and UR10e grasping cans using Robotiq 3F grippers."
+  ]
+  title "Truck Delivery"
+  basicTimeStep 16
+  physicsDisableAngularThreshold 0.1
+  contactProperties [
+    ContactProperties {
+      bounce 0.1
+    }
+    ContactProperties {
+      material1 "slope"
+      coulombFriction [
+        0.5
+      ]
+    }
+    ContactProperties {
+      material1 "InteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation -0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+    ContactProperties {
+      material1 "ExteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation 0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.29756196316501965 -0.05240866643258626 0.9532629279270947 3.4940740393813114
+  position 6.109629684933795 10.723348182431936 12.967624368908602
+  exposure 1.7
+}
+TexturedBackground {
+  texture "factory"
+}
+Floor {
+  translation -4 0 0
+  size 35 20
+  appearance ThreadMetalPlate {
+  }
+}
+Solid {
+  translation -28 0 0.002
+  children [
+    Shape {
+      appearance Parquetry {
+        type "dark strip"
+        colorOverride 0 0 0
+      }
+      geometry Box {
+        size 20 20 0.004
+      }
+    }
+  ]
+  name "floor(1)"
+}
+ParkingLines {
+  translation -18.3 -2.08 0.1
+  rotation 0 0 1 1.5708
+}
+ParkingLines {
+  translation -28.68 -2.08001 0.1
+  rotation 0 0 1 1.5708
+}
+Door {
+  hidden translation_5 0.001035501930291477 1.113493773996499e-05 0
+  hidden rotation_5 0 0 -1 7.474002976998623e-05
+  hidden linearVelocity_5 -7.963386379009546e-11 2.7665171667936022e-11 -1.4642796242856893e-06
+  hidden angularVelocity_5 5.740527326898838e-07 -3.0576043441861056e-08 -1.6548812632905253e-10
+  translation -18.09 -6.48 0
+  rotation 0 0 1 3.14159
+  position -7.474002981508456e-05
+}
+UnevenTerrain {
+  translation 20 0 -3.12
+  size 20 20 5
+}
+TruckSimple {
+  translation 17.76 1.13 0.82
+}
+DEF STORAGE_DRINKS Pose {
+  translation -17 1 0.85
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.5 0.9
+        transparency 0.85
+      }
+      geometry Box {
+        size 0.35 0.35 0.02
+      }
+    }
+  ]
+}
+Shelves {
+  translation -11.5 4.35 0
+  rotation 0 0 1 3.141592653589793
+  name "Chips section"
+}
+Shelves {
+  translation -11.5 6.1 0
+  rotation 0 0 1 3.14
+  name "Cheese section"
+}
+Shelves {
+  translation -11.5 7.9 0
+  rotation 0 0 1 3.14
+  name "Milk section"
+}
+Shelves {
+  translation -11.5 2.7 0
+  rotation 0 0 1 -3.141592653589793
+  name "Beer section"
+}
+ChipsPack {
+  translation -11.5697 4.54 0.8127
+  rotation 0 0 1 3.14159
+  name "demo_chips_item"
+}
+MilkCarton {
+  translation -11.5697 8.15001 0.83998
+  rotation 0 0 1 3.14159
+  name "demo_milk_item"
+}
+CheeseWedge {
+  translation -11.5697 6.29 0.8127
+  rotation 0 0 1 3.14159
+  name "demo_cheese_item"
+}
+BeerBottle {
+  translation -11.5697 2.89 0.8127
+  rotation 0 0 1 3.14159
+  name "demo_beer_item"
+}
+DEF STORE_YOUBOT_SORTER YoubotBoxGrip {
+  translation -7.5277 4.58907 0.101917
+  rotation 0 0 1 3.14159
+  name "youBot sorter"
+  controller "youbot_sorter_demo"
+  supervisor TRUE
+  bodySlot [
+    Pose {
+      translation 0 0.08 0.14
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.35 0.35 0.4
+            transparency 0.5
+            roughness 0.6
+          }
+          geometry Box {
+            size 0.22 0.18 0.02
+          }
+        }
+      ]
+    }
+    DistanceSensor {
+      translation 0.24 0 0.14
+      rotation 0 1 0 1.5707963267948966
+      name "front distance sensor"
+      lookupTable [
+        0 4095 0
+        0.05 3200 0.01
+        0.15 1800 0.02
+        0.35 700 0.04
+        0.6 150 0.06
+        1 0 0.08
+      ]
+      type "infra-red"
+    }
+  ]
+}
+DEF STORE_YOUBOT_RESTOCKER YoubotBoxGrip {
+  hidden linearVelocity_0 8.640361132750678e-05 -4.132966124441678e-07 -1.6666630040041832e-05
+  hidden angularVelocity_0 6.075150097000933e-06 0.0012846531808929633 -1.6398708582254521e-07
+  hidden translation_2 0 0 0.077
+  hidden rotation_2 0 0 1 5.647913592075502e-06
+  hidden linearVelocity_2 0.0002990405495718107 -6.562868140855168e-07 -0.00023434806528716313
+  hidden angularVelocity_2 6.265346469079672e-06 0.0012900692684186896 5.54817997935932e-05
+  hidden translation_3 0.033 0 0.07
+  hidden rotation_3 0 1 0 0.7269692395830746
+  hidden linearVelocity_3 0.08863149373557855 -4.4911901371869973e-07 -0.07741164513754671
+  hidden angularVelocity_3 6.957103417190997e-06 1.5013492236591897 -3.279474304447626e-06
+  hidden translation_4 0 0 0.155
+  hidden rotation_4 0 1 0 0.3475701459561189
+  hidden linearVelocity_4 0.22394583679231356 -1.6309067675624168e-06 -0.2408422793625912
+  hidden angularVelocity_4 6.934077783695797e-06 1.5303106421810284 -4.677821543756821e-06
+  hidden translation_5 0 0 0.135
+  hidden rotation_5 0 1 0 8.413549788888221e-07
+  hidden linearVelocity_5 0.295052535140341 -2.4311398591284366e-06 -0.3697284007776041
+  hidden angularVelocity_5 6.9337847568452844e-06 1.5303107087205796 -4.678249896525197e-06
+  hidden translation_6 0 0 0.081
+  hidden rotation_6 0 0 1 2.5463115409962945e-07
+  hidden linearVelocity_6 0.36912107929940974 -3.2492378945276674e-06 -0.5039844896227903
+  hidden angularVelocity_6 9.192366253223282e-06 1.530310339111826 -3.387727526972897e-06
+  hidden translation_8 0 0 0.0983
+  hidden rotation_8 0 0.9999999999999999 0 1.0238602338420164
+  hidden linearVelocity_8 0.14007705416764044 0.04424849865439624 -0.4717745831219367
+  hidden angularVelocity_8 1.7505151530266345 1.534659717775034 0.9676468586173048
+  hidden linearVelocity_13 0.1781227440818735 0.012295712043352742 -0.48964586126786824
+  hidden angularVelocity_13 1.7505151530682066 1.534659717757244 0.9676468586003151
+  hidden linearVelocity_14 0.0922107583105328 0.08129885188806914 -0.44427859338990566
+  hidden angularVelocity_14 1.7505151530413057 1.534659717759482 0.9676468586056167
+  hidden translation_16 0 0 0.0983
+  hidden rotation_16 0 -0.9999999999999999 0 1.0238602304186517
+  hidden linearVelocity_16 0.14008264222830266 -0.044245917590083755 -0.47177193526493966
+  hidden angularVelocity_16 -1.750496780557444 1.534585154861202 -0.967653936247049
+  hidden linearVelocity_21 0.17936898932487572 -0.00890609124826928 -0.48649693703315466
+  hidden angularVelocity_21 -1.75049678059937 1.5345851548437435 -0.9676539362317973
+  hidden linearVelocity_22 0.09221823803429667 -0.08129321600249562 -0.44427292500856636
+  hidden angularVelocity_22 -1.7504967805722842 1.5345851548458178 -0.9676539362362817
+  hidden translation_23 0.228 -0.158 -0.055
+  hidden rotation_23 0 -1 0 1.1920928955078128e-07
+  hidden linearVelocity_23 6.62279234067239e-05 -2.7517812315913703e-07 -0.0003007022504507965
+  hidden angularVelocity_23 6.078935220139366e-06 0.0012847541262882057 -1.638507790599796e-07
+  hidden translation_24 0.228 0.158 -0.055
+  hidden rotation_24 0 -1 0 1.1920928955078128e-07
+  hidden linearVelocity_24 6.623847036712367e-05 -4.084011531069213e-07 -0.00029881962789644943
+  hidden angularVelocity_24 6.072272367664212e-06 0.0012847584438100018 -1.638403339737344e-07
+  hidden translation_25 -0.228 -0.158 -0.055
+  hidden rotation_25 0 -1 0 5.960464477539063e-08
+  hidden linearVelocity_25 6.851144689449592e-05 -7.080588919622468e-07 0.0002734039468280983
+  hidden angularVelocity_25 6.05403625135471e-06 0.00128488680027128 -1.6382576707574463e-07
+  hidden translation_26 -0.228 0.158 -0.055
+  hidden rotation_26 0 -1 0 5.960464477539063e-08
+  hidden linearVelocity_26 6.854620864525653e-05 1.2950597123529638e-07 0.0002752865693867089
+  hidden angularVelocity_26 6.095907233552982e-06 0.0012848899775839996 -1.6387611993527976e-07
+  translation -1.8743526472510978 0.5737770276270298 0.10192672185427962
+  rotation -0.011846207522275703 0.9999298311758618 9.589141041082133e-06 0.0032982374532940445
+  name "youBot restocker"
+  controller "youbot_restocker_demo"
+  supervisor TRUE
+}
+Group {
+  children [
+    Pose {
+      translation 7.47 0.6 0.990001
+      rotation 0.5773509358554485 -0.5773489358556708 -0.5773509358554485 2.094395307179586
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0 0 0
+            roughness 1
+            metalness 0
+          }
+          geometry Box {
+            size 1 0.8 0.01
+          }
+        }
+      ]
+    }
+    Wall {
+      translation -3.95 -9.97 0
+      name "wall(1)"
+      size 28 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -1.01 -0.64 0.47
+      name "wall(3)"
+      size 0.1 1.3 0.9
+    }
+    Wall {
+      translation 0.14 1.14 0
+      rotation 0 0 1 -1.5707953071795862
+      name "wall(13)"
+      size 0.1 2.4 1.4
+    }
+    Wall {
+      translation 0.14 -0.03 0
+      rotation 0 0 1 -1.5707953071795862
+      name "wall(6)"
+      size 0.1 2.4 1.4
+    }
+    LeverValve {
+      hidden translation_1 0 1.5992226023459366e-08 -6.394190732450511e-15
+      hidden rotation_1 -1 0 0 7.996802249550121e-07
+      hidden linearVelocity_1 -8.478017505711511e-10 8.667555990056744e-11 -4.497705447069957e-09
+      hidden angularVelocity_1 -6.218221081377351e-10 -6.082255124297659e-09 -7.588206814810419e-14
+      translation 2.01 0.88 0.502
+      rotation 0 0 -1 -1.5707953071795862
+    }
+    WoodenPalletStack {
+      translation 0.66 -1.71 0
+      rotation 0 0 1 -1.5707953071795862
+      palletNumber 5
+      palletSize 0.8 1 0.11
+    }
+    Wall {
+      translation -4.105 9.89 0
+      rotation 0 1 0 0
+      size 28 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -18.05 -0.0400001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall"
+      size 20 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation 9.87 6.49003 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(2)"
+      size 7 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation 10.01 -5.36997 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(3)"
+      size 9 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 -3.84999 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(1)"
+      size 12.2 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 3.51001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(4)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 3.51001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(5)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 5.25001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(6)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 7.00001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(7)"
+      size 0.8 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 9.12001 0
+      rotation 0 0 1 -1.5707953071795862
+      name "Shop wall(9)"
+      size 1.5 0.2 2.4
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 2.63001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 4.40001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(1)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 6.14001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(2)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+    Wall {
+      translation -11.22 7.89001 0.91
+      rotation 0 0 1 -1.5707953071795862
+      name "sorting dock(3)"
+      size 1 0.2 1.5
+      appearance Roughcast {
+        textureTransform TextureTransform {
+          scale 2 1
+        }
+      }
+    }
+  ]
+}
+SolidBox {
+  translation -2.205 0.5377 -0.585
+  size 1 0.8 0.61
+  appearance GalvanizedMetal {
+  }
+}
+ConveyorBelt {
+  hidden linearVelocity_1 -1.7780944089906501e-06 -3.775950575006164e-09 2.7383633379087783e-05
+  hidden angularVelocity_1 -9.924685849582938e-10 -4.672697608189906e-06 -3.889677574462732e-09
+  translation 3.7 0.54 0
+  rotation 0 0 1 3.141592
+  name "conveyor_cardbox"
+  size 10 0.7 0.15
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0.2
+}
+ConveyorBelt {
+  hidden linearVelocity_1 0 0 -6.211997606441394e-08
+  translation -5.24 -0.625782 -0.01
+  rotation 0 0 1 3.14
+  name "conveyor belt(1)"
+  size 5 1 0.25
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0.1
+  acceleration 0.012
+}
+Robot {
+  translation -0.67 1.77 0
+  children [
+    Receiver {
+      name "rx"
+      channel 1
+    }
+  ]
+  name "conveyor_pallet_left"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF RIGHT_BELT ConveyorBelt {
+  hidden linearVelocity_1 0 0 -6.211997606441394e-08
+  translation -0.67 -0.65 0
+  rotation 0 0 1 3.14
+  name "conveyor belt(2)"
+  size 4 1 0.25
+  appearance CorrugatedMetal {
+    textureTransform TextureTransform {
+      scale 6 3.1
+    }
+  }
+  borderHeight 0
+  speed 0
+}
+Robot {
+  translation -0.67 -0.65 0
+  children [
+    Receiver {
+      name "rx"
+      channel 2
+    }
+  ]
+  name "conveyor_pallet_right"
+  controller "<none>"
+  supervisor TRUE
+}
+Robot {
+  translation 0 -0.62 0.54
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "right_pallet_spawner"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF IPR_BOX_SPAWN_PAD Robot {
+  translation 9.38 1.19 -0.1
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "right_pallet_spawner(1)"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF BEER_STOCK Robot {
+  translation -10.5 1.83 -0.12
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "BEER STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF CHIPS_STOCK Robot {
+  translation -10.5 3.5 -0.09
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "CHIPS STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF CHEESE_STOCK Robot {
+  translation -10.52 5.27 -0.09
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "CHEESE STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF MILK_STOCK Robot {
+  translation -10.51 7.14 -0.08
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "MILK STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+Robot {
+  translation -10.5 4.5 0.5
+  children [
+    DistanceSensor {
+      translation 0 -2.67 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_beer"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 -1 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_chips"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation -0.02 0.77 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_cheese"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation -0.01 2.64 -0.35
+      rotation 1 0 0 1.5708
+      name "stock_monitoring_milk"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+  ]
+  name "stock_monitoring"
+  controller "stock_monitoring"
+  supervisor TRUE
+}
+Robot {
+  translation -10.8 4.9 1
+  children [
+    DistanceSensor {
+      translation 0 -2.2 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_beer"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 -0.55 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_chips"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 1.2 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_cheese"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+    DistanceSensor {
+      translation 0 3 -0.55
+      rotation 1 0 0 1.5708
+      name "shelf_monitor_milk"
+      lookupTable [
+        0 0 0
+        0.5 0.5 0
+        1 1 0
+      ]
+    }
+  ]
+  name "shelf_monitoring"
+  controller "shelf_monitoring"
+  supervisor TRUE
+}
+Robot {
+  translation -1.04085 1.18648 1.32
+  rotation 0 0 1 -2.8797953071795863
+  children [
+    Emitter {
+      children [
+        Monitor {
+        }
+      ]
+      name "tx"
+      channel 2
+    }
+  ]
+  name "restocking_task_manager"
+  controller "restocking_task_manager_demo"
+  supervisor TRUE
+}
+Robot {
+  translation -0.01 1.09 0.24
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance GalvanizedMetal {
+      }
+      geometry Box {
+        size 0.1 0.1 0.1
+      }
+    }
+    DistanceSensor {
+      translation -4.07728e-08 0 0.08
+      rotation 0 1 0 -1.5707953071795862
+      lookupTable [
+        0 0 0
+        1 1 0
+      ]
+    }
+  ]
+  name "test_controller_sensor"
+  controller "scanner_controller"
+  supervisor TRUE
+}
+DEF AUTONOMOUS_GROCERY_STORE_PROTOTYPE Group {
+  children [
+    DEF GROCERY_CONVEYOR ConveyorBelt {
+      hidden linearVelocity_1 1.7845219770930904e-06 -1.0956536981150125e-09 -2.7532542401726906e-05
+      hidden angularVelocity_1 3.240889467067294e-11 -6.386605518426452e-06 1.8667403067577345e-09
+      translation 4.1 0.54 0.02
+      name "GROCERY_CONVEYOR"
+      size 3.6 0.7 0.12
+      appearance CorrugatedMetal {
+        textureTransform TextureTransform {
+          scale 4 2
+        }
+      }
+      borderHeight 0
+      speed 0
+    }
+    Solid {
+      translation 4.1 0.54 0.011
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.18 0.18 0.18
+            roughness 0.7
+          }
+          geometry Box {
+            size 6.2 1.05 0.02
+          }
+        }
+      ]
+      name "CONVEYOR_ZONE"
+    }
+    Solid {
+      translation 2.25 0.54 0.015
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.95 0.85 0.05
+            roughness 0.5
+          }
+          geometry Box {
+            size 0.75 0.75 0.03
+          }
+        }
+      ]
+      name "DETECTION_ZONE"
+    }
+  ]
+}
+DEF SPAWNED_BOX_0 CardboardBox {
+  hidden linearVelocity_0 4.544981139999557e-05 1.2471093588795803e-06 7.34218970180222e-06
+  hidden angularVelocity_0 -2.4748771187077004e-05 -8.446329260324158e-05 4.1917387644945013e-07
+  translation -1.2500659576839566 0.5727184542562506 0.19908459231763706
+  rotation -0.0004356530061882096 -7.903185148817296e-07 0.9999999051029124 3.1415893387580387
+  name "SPAWNED_BOX"
+  size 0.1 0.1 0.1
+  mass 0.1
+}
+IprHd6ms180 {
+  hidden translation_1 0 0 0.2265
+  hidden rotation_1 0 0 1 0.12479044580862447
+  hidden linearVelocity_1 5.482910974797031e-09 -8.327665390245573e-10 -2.370233809414858e-07
+  hidden angularVelocity_1 -4.75917906610966e-09 5.15220196756564e-10 -1.1073084290529974e-05
+  hidden translation_2 0 0 0
+  hidden rotation_2 -1 0 0 0.5977753440207324
+  hidden linearVelocity_2 -5.743080704425696e-07 -7.241489677564474e-09 -3.960451691323916e-07
+  hidden angularVelocity_2 -1.0651475710246665e-08 1.0228925312928406e-09 -1.1072967395002822e-05
+  hidden translation_3 0 0 0.19
+  hidden rotation_3 0.9999999999999999 0 0 2.221800958004575
+  hidden linearVelocity_3 -5.506936589647796e-07 -1.1810756487011086e-08 -5.442391016785192e-07
+  hidden angularVelocity_3 -1.6561880867026645e-08 1.3581244559474903e-09 -1.1072959613828206e-05
+  hidden translation_4 0 0 0.139
+  hidden rotation_4 -1 0 0 2.0333103476446093
+  hidden linearVelocity_4 1.5151775445860333e-07 -4.969961263971086e-09 -6.436827881371983e-07
+  hidden angularVelocity_4 -2.239868789501913e-08 1.617656227588546e-09 -1.1072894832278513e-05
+  hidden translation_5 0 0 0.1185
+  hidden rotation_5 0 0 0.9999999999999999 2.993189822948065
+  hidden linearVelocity_5 -3.324713028326478e-07 8.538144161060664e-09 -6.844413401730358e-07
+  hidden angularVelocity_5 -2.1399960787157333e-08 1.4114023982330844e-06 -1.4322499259220105e-05
+  hidden translation_6 0 0 0.0983
+  hidden rotation_6 0 1 0 0.2719986744481863
+  hidden linearVelocity_6 0.024711007128849584 0.0008409551171707113 -0.011569722479105695
+  hidden angularVelocity_6 0.07670032619903844 0.4532023196599791 0.19677570064932534
+  hidden linearVelocity_11 0.013257718492913186 0.002133654302251149 -0.010082671961629775
+  hidden angularVelocity_11 0.07670032619907717 0.4532023196605186 0.19677570064969047
+  hidden linearVelocity_12 0.03927497249934201 -0.00027638748071092084 -0.014673145955242769
+  hidden angularVelocity_12 0.0767003261990451 0.45320231966021446 0.19677570064951935
+  hidden translation_14 0 0 0.0983
+  hidden rotation_14 0 -1 0 0.2719986328801973
+  hidden linearVelocity_14 -0.02465909766255267 0.0079205274814334 -0.008629867821776927
+  hidden angularVelocity_14 -0.07670035746633178 -0.45319943092155857 -0.1968043170080891
+  hidden linearVelocity_19 -0.012946105901156663 0.0062756975355558135 -0.00940705886589349
+  hidden angularVelocity_19 -0.07670035746631455 -0.4531994309221102 -0.19680431700822695
+  hidden linearVelocity_20 -0.03921167921537956 0.010978228124384651 -0.009999560865791733
+  hidden angularVelocity_20 -0.07670035746631391 -0.4531994309218816 -0.19680431700816478
+  translation 8.93 0.59 0
+  rotation 0 0 -1 -3.0106903061004253
+  controller "ipr_pick_demo"
+  supervisor TRUE
+}

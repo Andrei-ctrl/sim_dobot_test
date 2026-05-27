@@ -2,6 +2,8 @@
 
 import math
 
+JOINT_ZERO_EPS = 1e-4
+
 
 def clamp_joint_position(motor, value):
     if motor is None:
@@ -12,9 +14,22 @@ def clamp_joint_position(motor, value):
         return value
     if hi <= lo + 1e-9:
         return lo
-    return max(lo, min(hi, value))
+    clamped = max(lo, min(hi, value))
+    if lo <= 0.0 <= hi and abs(clamped) < JOINT_ZERO_EPS:
+        return 0.0
+    if abs(clamped - lo) < JOINT_ZERO_EPS:
+        return lo
+    if abs(clamped - hi) < JOINT_ZERO_EPS:
+        return hi
+    return clamped
 
 
 def set_joint_position(motor, value):
     if motor is not None:
         motor.setPosition(clamp_joint_position(motor, value))
+
+
+def snap_motors(motor_values):
+    """motor_values: iterable of (motor, target) pairs."""
+    for motor, value in motor_values:
+        set_joint_position(motor, value)

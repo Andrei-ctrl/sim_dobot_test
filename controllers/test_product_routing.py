@@ -8,12 +8,17 @@ import product_routing as routing
 
 
 class TestProductRouting(unittest.TestCase):
-    def test_all_boxes_route_to_beer(self):
-        for box_def in ("SPAWNED_BOX_0", "SPAWNED_BOX_1", "SPAWNED_BOX_7"):
-            route = routing.route_for_box_def(box_def)
-            self.assertEqual(route["def"], "BEER_STOCK")
-            self.assertEqual(route["product_id"], "BEER_BOTTLE")
-            self.assertEqual(route["shelf_name"], "Beer section")
+    def test_box_round_robin_routes(self):
+        routes = [routing.route_for_box_def(f"SPAWNED_BOX_{i}")["def"] for i in range(4)]
+        self.assertEqual(
+            routes,
+            ["BEER_STOCK", "CHIPS_STOCK", "CHEESE_STOCK", "MILK_STOCK"],
+        )
+
+    def test_box_routes_by_product_id(self):
+        route = routing.route_for_box_def("SPAWNED_BOX_0", product_id="MILK")
+        self.assertEqual(route["def"], "MILK_STOCK")
+        self.assertEqual(route["product_id"], "MILK")
 
     def test_four_pallet_defs_exist(self):
         self.assertEqual(len(routing.STOCK_PALLETS), 4)

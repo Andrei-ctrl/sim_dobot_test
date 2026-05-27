@@ -1,5 +1,7 @@
 """Product / stock-pallet / shelf routing registry (Webots-independent)."""
 
+import re
+
 DEFAULT_PALLET_DEF = "BEER_STOCK"
 
 STOCK_PALLETS = {
@@ -45,12 +47,38 @@ STOCK_PALLETS = {
     },
 }
 
-PALLET_ZONE_RADIUS = 0.45
+PALLET_ZONE_RADIUS = 0.65
+
+
+def node_world_xyz(node):
+    """World XYZ for a scene node (Supervisor API)."""
+    if node is None:
+        return None
+    try:
+        pos = node.getPosition()
+        if pos and len(pos) >= 3:
+            return [float(pos[0]), float(pos[1]), float(pos[2])]
+    except (AttributeError, TypeError, RuntimeError):
+        pass
+    try:
+        field = node.getField("translation")
+        if field is not None:
+            return [float(v) for v in field.getSFVec3f()]
+    except (AttributeError, TypeError, RuntimeError):
+        pass
+    return None
 BOX_DEF_PREFIX = "SPAWNED_BOX_"
 
 
-def route_for_box_def(box_def):
-    """All boxes route to BEER for now; extend here for multi-product."""
+def route_for_box_def(box_def, product_id=None):
+    """Route a spawned box to a stock pallet (explicit product or round-robin fallback)."""
+    if product_id:
+        return route_for_product_id(product_id)
+    match = re.match(r"SPAWNED_BOX_(\d+)", box_def or "")
+    if match:
+        pallets = iter_pallet_defs()
+        pallet_def = pallets[int(match.group(1)) % len(pallets)]
+        return dict(STOCK_PALLETS[pallet_def])
     return dict(STOCK_PALLETS[DEFAULT_PALLET_DEF])
 
 

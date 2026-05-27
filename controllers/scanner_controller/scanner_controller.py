@@ -15,8 +15,12 @@ if _CONTROLLERS_DIR not in sys.path:
     sys.path.insert(0, _CONTROLLERS_DIR)
 
 import spawn_signal  # noqa: E402
+import conveyor_scan_signal  # noqa: E402
 import box_routing  # noqa: E402
 import product_routing  # noqa: E402
+import dashboard_client  # noqa: E402
+import conveyor_intrusion  # noqa: E402
+import conveyor_unknown_signal  # noqa: E402
 
 DASHBOARD_URL = "http://127.0.0.1:8000/update"
 SEND_TO_DASHBOARD = True
@@ -56,6 +60,8 @@ class ScannerController:
         self.scanned_pick_slot = set()
         self.completed_pickups = set()
         self.active_task = None
+        self.root_children = self.robot.getRoot().getField("children")
+        self.scanned_unknown_at_scanner = set()
 
         self.restocker_node = self.robot.getFromDef("STORE_YOUBOT_RESTOCKER")
         self.restocker_translation_field = None
@@ -196,14 +202,22 @@ class ScannerController:
 
         if zone == "upstream_scanner":
             print("[SCANNER] Product entered upstream conveyor scanner zone")
-            assignment = box_routing.assign_box(
-                self.project_root, info["def"], self.robot.getTime()
-            )
+            assignment = box_routing.read_assignment(self.project_root, info["def"])
+            if assignment is None:
+                assignment = box_routing.assign_box(
+                    self.project_root, info["def"], self.robot.getTime()
+                )
             print(
                 f"[SCANNER] Routed {info['def']} → {assignment['target_pallet']} "
                 f"({assignment['product_id']}) shelf={assignment['shelf_name']}"
             )
             self.notify_box_spawner(info["def"])
+            conveyor_scan_signal.write_scan(
+                self.project_root,
+                info["def"],
+                info["product_id"],
+                self.robot.getTime(),
+            )
         else:
             print("[SCANNER] Product arrived at youBot fixed pick slot")
             if box_routing.read_assignment(self.project_root, info["def"]) is None:
@@ -325,6 +339,45 @@ class ScannerController:
 
         if ENABLE_SCANNER_DIAG and self.step % DIAG_LOG_INTERVAL == 0:
             self.log_diagnostics()
+
+    def scan_unknown_conveyor_objects(self):
+        unknowns = conveyor_intrusion.find_unknown_at_scanner(
+            self.root_children,
+            self.robot.getFromDef,
+            self.scanner_xy,
+            self.scan_radius,
+        )
+        if not unknowns:
+            return
+
+        for obj in unknowns:
+            key = conveyor_intrusion.object_key(obj)
+            if key in self.scanned_unknown_at_scanner:
+                continue
+            self.scanned_unknown_at_scanner.add(key)
+            label = conveyor_intrusion.format_object_label(obj)
+            print(
+                f"[SCANNER EXCEPTION] Unknown object passed conveyor scanner: {label} "
+                f"(type={obj.get('type_name')}, zone=upstream_scanner)"
+            )
+            conveyor_unknown_signal.write_signal(
+                self.project_root,
+                obj,
+                self.robot.getTime(),
+                scanner_xy=self.scanner_xy,
+            )
+            dashboard_client.post_robot_failure(
+                self.project_root,
+                "scanner",
+                f"unknown object at conveyor scanner: {label}",
+                source="scanner",
+                sim_time=self.robot.getTime(),
+                object_name=obj.get("name") or "",
+                object_type=obj.get("type_name") or "",
+                object_def=obj.get("def_name") or "",
+                position=obj.get("position"),
+                zone="upstream_scanner",
+            )
 
     def interpolate(self, start, end, progress):
         progress = max(0.0, min(1.0, progress))
@@ -458,6 +511,7 @@ class ScannerController:
     def run(self):
         while self.robot.step(self.timestep) != -1:
             self.scan_products()
+            self.scan_unknown_conveyor_objects()
             self.update_restocker_task()
             self.step += 1
 
@@ -491,19 +545,7 @@ class ScannerController:
             f"threshold={item['threshold']}"
         )
 
-        if item["front_stock"] < item["threshold"] and item["storage_stock"] > 0:
-            print(f"[RESTOCK TASK] Front shelf below threshold for {product_id}")
-            print(f"[RESTOCK TASK] Assign youBot restocker to move item to {item['front_shelf']}")
-
-            item["storage_stock"] -= 1
-            item["front_stock"] += 1
-
-            print(
-                f"[RESTOCK COMPLETE] {product_id}: "
-                f"storage={item['storage_stock']}, "
-                f"front={item['front_stock']}"
-            )
-
+        # Legacy simulated restock disabled — task_manager + youBot sorter handle thresholds.
         self.save_inventory(inventory)
         return inventory[product_id]
 
@@ -528,6 +570,9 @@ class ScannerController:
         self.active_task = None
 
     def identify_product_id(self, product_def, product):
+        assignment = box_routing.read_assignment(self.project_root, product_def)
+        if assignment is not None:
+            return assignment["product_id"]
         route = product_routing.route_for_box_def(product_def)
         return route["product_id"]
 

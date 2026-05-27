@@ -1,0 +1,242 @@
+================================================================================
+FACTORY SIM — THREE WORLDS, ONE CODEBASE
+================================================================================
+
+All three worlds use the SAME Python controllers in controllers/. Each .wbt file
+is a saved scene (layout, starting stock, test props) plus the same supervisor
+stack:
+
+  youbot_restocker_demo, youbot_sorter_demo, ipr_pick_demo, scanner_controller,
+  stock_monitoring, shelf_monitoring, restocking_task_manager_demo
+
+World file                          Webots title        Purpose
+----------------------------------  ------------------  ---------------------------
+worlds/exception_handling.wbt       Exception Handling  Failures / exceptions
+worlds/triger_threshold.wbt       Threshold Testing   Shelf + pallet thresholds
+worlds/truck_delivery.wbt           Truck Delivery      Normal flow (truck scene)
+
+Dashboard (all worlds):
+  python dashboard_server.py   →   http://127.0.0.1:8000
+
+
+--------------------------------------------------------------------------------
+BEFORE EVERY TEST SESSION
+--------------------------------------------------------------------------------
+
+1. Start dashboard in a separate terminal:
+     python dashboard_server.py
+
+2. Open ONE world in Webots (do not run two worlds at once).
+
+3. Recommended when switching worlds:
+   - Stop simulation
+   - File → Reload World (reverts to saved shelf/pallet layout)
+   - Or delete stale runtime files in data/:
+       last_failure.json, conveyor_unknown.json, spawn_signal.json,
+       sort_queue.json (optional — task manager rebuilds state)
+
+4. Press Play and wait 5–10 s for:
+     [SHELF MONITORING] Baseline shelf counts
+     [TASK MANAGER] Pallet box sync at t=...
+
+5. Confirm dashboard Stock & Shelves shows Front shelf N/9 and Stock pallet N/5.
+
+
+--------------------------------------------------------------------------------
+SHARED RULES (same in all three worlds)
+--------------------------------------------------------------------------------
+
+Front shelf (per product: BEER_BOTTLE, CHIPS, CHEESE, MILK)
+  Max 9 items (3×3). Sort when ≥1 full row missing vs baseline (9 → 6).
+  Sort blocked when shelf full (9/9) or not enough room for +3 items.
+
+Stock pallet (warehouse)
+  Max 5 boxes. IPR reorder when count drops below 3 (replenish to 5).
+  After first spawn: next spawn waits for conveyor scanner + 50 s delay.
+
+Restocker routes boxes to all four pallets using data/box_routing.json:
+  BEER_STOCK, CHIPS_STOCK, CHEESE_STOCK, MILK_STOCK.
+
+Constants: controllers/restocking_task_manager.py, data/inventory.json
+Details:   threshold_instruction.txt (full threshold test matrix)
+
+
+================================================================================
+WORLD 1 — exception_handling.wbt  (Exception Handling)
+================================================================================
+
+Saved conditions:
+  - RubberDuck on the moving cardbox belt (unknown-object test)
+  - Full factory layout; same DEF names as other worlds
+  - Use for robot_failure, unknown object, restock verify failures
+
+Open:  worlds/exception_handling.wbt
+More:  exception_handling_instruction.txt (Tests 1–9 in full detail)
+
+QUICK TESTS
+-----------
+
+A) Unknown object at conveyor scanner
+   1. Play world (remove duck first if testing restocker-only tests below).
+   2. Wait until duck reaches upstream scanner (x≈0, y≈0.56) or pause and
+      place a foreign Solid inside scanner zone (-0.01, 1.09, r=0.8 m).
+   Expect: [SCANNER EXCEPTION] Unknown object passed conveyor scanner
+           Dashboard Last Failure: robot=scanner, zone=upstream_scanner
+           data/conveyor_unknown.json written
+
+B) Restock failure — box deleted mid-carry
+   1. Delete RubberDuck from scene tree (restocker blocked while duck exists).
+   2. Wait until restocker is picking / carrying / driving to pallet.
+   3. Pause → delete carried SPAWNED_BOX_* → resume.
+   Expect: RESTOCK FAILURE: box removed before pallet drop
+           Dashboard Last Failure: robot=restocker
+
+C) Restock success verification
+   1. Let one full cycle complete (conveyor pick → pallet → verify).
+   Expect: Restock verified on BEER_STOCK (or routed pallet): N → N+1
+           Dashboard Last Event: event=restock_complete
+
+D) Sorter failure
+   1. Pause during active sort; delete target box from stock pallet; resume.
+   Expect: Sort failed … box load incomplete; sort_queue status "failed"
+
+Checklist:
+[ ] Title bar: "Exception Handling"
+[ ] Last Failure / Last Event panels update
+[ ] Tests A–D pass
+
+
+================================================================================
+WORLD 2 — triger_threshold.wbt  (Threshold Testing)
+================================================================================
+
+Saved conditions:
+  - NO RubberDuck — clean belt for threshold / replenishment tests
+  - Same controller stack as exception_handling
+  - Shelves/pallets saved at typical full-stock starting layout
+
+Open:  worlds/triger_threshold.wbt
+More:  threshold_instruction.txt (Tests A–G in full detail)
+
+QUICK TESTS
+-----------
+
+A) Front shelf full → no sort
+   - Default run with shelves at 9/9.
+   Expect: Dashboard Status "Shelf full"; no new sort_queue entry.
+
+B) Row missing → sort triggered
+   1. Pause → delete 3 front-shelf items for one product (9 → 6).
+   2. Resume; wait ~5 s.
+   Expect: data/shelf_counts.json shows 6; sort_queue new task;
+           [YOUBOT SORTER] picks from matching stock pallet.
+
+C) Stock pallet low → IPR reorder
+   1. Pause → delete boxes on one stock pallet until 2 remain.
+   2. Resume; wait for [TASK MANAGER] Pallet box sync.
+   Expect: Dashboard Stock pallet 2/5, Status "Reorder pallet";
+           [TASK MANAGER] IPR spawn request; data/spawn_signal.json new seq;
+           IPR spawns SPAWNED_BOX_N at DEF IPR_BOX_SPAWN_PAD.
+
+D) Stock pallet full → no reorder
+   - Pallet at 5/5 boxes.
+   Expect: No new spawn_signal for that product.
+
+E) Spawn cooldown (second box)
+   - After Test C spawn, wait for conveyor scanner log, then 50 s before
+     next spawn for same product (if pallet still < 5).
+
+Checklist:
+[ ] Title bar: "Threshold Testing"
+[ ] Tests A–E pass
+[ ] data/pallet_counts.json and data/shelf_counts.json update on dashboard
+
+
+================================================================================
+WORLD 3 — truck_delivery.wbt  (Truck Delivery)
+================================================================================
+
+Saved conditions:
+  - TruckSimple vehicle in scene (delivery / logistics layout)
+  - NO RubberDuck — normal operation
+  - Box may already be at conveyor pick slot (SPAWNED_BOX at restocker)
+  - DEF IPR_BOX_SPAWN_PAD, all four stock pallets, full supervisor stack
+
+Open:  worlds/truck_delivery.wbt
+
+QUICK TESTS
+-----------
+
+A) Baseline startup
+   1. Play world; wait 10 s.
+   Expect: All three robots show activity or idle on dashboard (not stuck);
+           shelf baseline logged; pallet sync logged;
+           no controller ERROR lines in Webots console.
+
+B) Conveyor restock loop
+   1. Watch restocker at conveyor home.
+   2. If box at pick slot or IPR spawns one, restocker picks → drives to
+      routed pallet (check console for pallet name) → verify restock.
+   Expect: [YOUBOT RESTOCKER] Restock verified on … (+1)
+           Stock pallet count increases on dashboard.
+
+C) IPR spawn from truck pad
+   1. Pause → reduce one stock pallet to 2 boxes → resume.
+   Expect: [BOX SPAWNER] Task manager ordered … spawning at
+           DEF IPR_BOX_SPAWN_PAD (8.93, 1.15)
+   2. Box travels on belt → scanner upstream log → restocker pick.
+
+D) Sort to front shelf (when shelf has room)
+   1. Pause → remove 3 items from one front shelf row (9 → 6) → resume.
+   Expect: Sort task queued; sorter runs when stock pallet has boxes and
+           front shelf has room.
+
+E) End-to-end (happy path)
+   Low pallet → IPR spawn → conveyor → restocker → stock pallet →
+   (when shelf gap) sorter → front shelf.
+   Expect: Counts on dashboard move toward targets without Last Failure.
+
+Checklist:
+[ ] Title bar: "Truck Delivery"
+[ ] Truck visible in 3D view
+[ ] Tests A–E: normal flow with no Last Failure under default conditions
+
+
+================================================================================
+TROUBLESHOOTING (all worlds)
+================================================================================
+
+Dashboard shows "- / 5" for stock pallet:
+  shelf_monitoring or restocking_task_manager_demo not running — reload world.
+
+Restocker never picks:
+  RubberDuck / conveyor_unknown.json blocking (exception world only) —
+  delete duck or remove data/conveyor_unknown.json.
+
+Last Failure stuck on old event:
+  New failure posts overwrite; reload dashboard or check data/last_failure.json.
+
+Motor limit warnings at startup:
+  Harmless; controllers clamp joints on first step.
+
+Unit tests (no Webots):
+  python -m unittest controllers.test_restocking_task_manager -v
+  python -m unittest controllers.test_conveyor_intrusion -v
+  python -m unittest controllers.test_product_routing -v
+
+
+================================================================================
+SUBMISSION CHECKLIST (2–3 worlds)
+================================================================================
+
+[ ] instruction.txt (this file) included
+[ ] exception_handling.wbt — Tests A–D
+[ ] triger_threshold.wbt — Tests A–E
+[ ] truck_delivery.wbt — Tests A–E
+[ ] dashboard_server.py runs; screenshot of dashboard for each world optional
+
+See also:
+  exception_handling_instruction.txt  — detailed exception tests 1–9
+  threshold_instruction.txt           — detailed threshold tests A–G
+
+================================================================================

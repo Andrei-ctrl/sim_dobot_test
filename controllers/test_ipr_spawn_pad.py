@@ -17,16 +17,20 @@ class TestIprSpawnPad(unittest.TestCase):
 
     def test_resolves_from_spawn_pad_def(self):
         node = mock.MagicMock()
-        node.getPosition.return_value = [9.38, 1.19, -0.1]
 
         def get_from_def(name):
             return node if name == pad.IPR_BOX_SPAWN_PAD_DEF else None
 
-        position, _rotation, ok = pad.resolve_spawn_pad(get_from_def)
+        position, rotation, ok = pad.resolve_spawn_pad(get_from_def)
         self.assertTrue(ok)
-        self.assertAlmostEqual(position[0], 9.38)
-        self.assertAlmostEqual(position[1], 1.19)
-        self.assertAlmostEqual(position[2], -0.1 + pad.PALLET_TOP_OFFSET_Z)
+        self.assertEqual(position, pad.BOX_SPAWN_XYZ)
+        self.assertEqual(rotation, pad.BOX_SPAWN_ROTATION)
+
+    def test_fallback_uses_measured_box_pose(self):
+        position, rotation, ok = pad.resolve_spawn_pad(lambda _name: None)
+        self.assertFalse(ok)
+        self.assertEqual(position, pad.BOX_SPAWN_XYZ)
+        self.assertEqual(rotation, pad.BOX_SPAWN_ROTATION)
 
 
 if __name__ == "__main__":

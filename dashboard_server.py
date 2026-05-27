@@ -14,6 +14,12 @@ DEFAULT_STATE = {
     "inventory": {},
     "shelf_counts": {},
     "baseline_shelf_counts": {},
+    "shelf_capacity": {},
+    "pallet_counts": {},
+    "stock_rules": {
+        "pallet_target": 5,
+        "pallet_reorder_below": 3,
+    },
     "sort_queue": [],
     "restock_queue": [],
     "active_tasks": [],
@@ -23,6 +29,8 @@ DEFAULT_STATE = {
         "ipr": {"status": "unknown", "detail": "IPR pick arm"},
     },
     "last_event": None,
+    "last_failure": None,
+    "threshold_events": [],
 }
 
 LATEST = dict(DEFAULT_STATE)
@@ -49,27 +57,29 @@ def state_with_disk():
                 "sim_time": shelf.get("sim_time"),
                 "shelf_counts": shelf.get("counts", {}),
                 "baseline_shelf_counts": shelf.get("baseline_counts", {}),
+                "shelf_capacity": shelf.get("capacity", {}),
                 "source": shelf.get("source") or state.get("source"),
             },
         )
-    inventory = _load_json(os.path.join(DATA_DIR, "inventory.json"))
-    if inventory:
-        counts = state.get("shelf_counts") or {}
-        merged_inv = dict(inventory)
-        for product_id, count in counts.items():
-            item = dict(merged_inv.get(product_id) or {})
-            item["front_stock"] = int(count) * 2
-            merged_inv[product_id] = item
-        state = merge_state(state, {"inventory": merged_inv})
-    sort_queue = _load_json(os.path.join(DATA_DIR, "sort_queue.json"), default=[])
-    if isinstance(sort_queue, list) and sort_queue:
-        state["sort_queue"] = sort_queue
-    restock_queue = _load_json(os.path.join(DATA_DIR, "restock_queue.json"), default=[])
-    if isinstance(restock_queue, list) and restock_queue:
-        state["restock_queue"] = restock_queue
     system = _load_json(os.path.join(DATA_DIR, "system_state.json"))
     if system:
         state = merge_state(state, system)
+    pallet = _load_json(os.path.join(DATA_DIR, "pallet_counts.json"))
+    if pallet and pallet.get("counts"):
+        state["pallet_counts"] = pallet["counts"]
+        if pallet.get("stock_rules"):
+            state["stock_rules"] = pallet["stock_rules"]
+    sort_queue = _load_json(os.path.join(DATA_DIR, "sort_queue.json"), default=[])
+    if isinstance(sort_queue, list) and sort_queue and not state.get("sort_queue"):
+        state["sort_queue"] = sort_queue
+    restock_queue = _load_json(os.path.join(DATA_DIR, "restock_queue.json"), default=[])
+    if isinstance(restock_queue, list) and restock_queue and not state.get("restock_queue"):
+        state["restock_queue"] = restock_queue
+    if not state.get("stock_rules"):
+        state["stock_rules"] = dict(DEFAULT_STATE["stock_rules"])
+    failure = _load_json(os.path.join(DATA_DIR, "last_failure.json"))
+    if failure and not state.get("last_failure"):
+        state["last_failure"] = failure
     return state
 
 INDEX_HTML = b"""<!doctype html>
@@ -144,14 +154,25 @@ INDEX_HTML = b"""<!doctype html>
       border-radius: 0 8px 8px 0;
       font-size: 0.85rem;
     }
+    .event-failure {
+      background: #2a1414;
+      border-left-color: var(--bad);
+    }
+    .event-threshold {
+      background: #14202a;
+      border-left-color: var(--warn);
+    }
     .empty { color: var(--muted); font-size: 0.85rem; }
     .low { color: var(--bad); font-weight: 600; }
+    .full { color: var(--warn); font-weight: 600; }
+    .ok { color: var(--ok); }
+    .hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
     .sensor { margin-top: 12px; font-size: 0.8rem; color: var(--muted); }
   </style>
 </head>
 <body>
   <h1>Factory Restock Dashboard</h1>
-  <div class="subtitle">triger_trashhold world - task manager, sorter, restocker, IPR</div>
+  <div class="subtitle">exception_handling world - task manager, sorter, restocker, IPR</div>
 
   <div class="grid">
     <div class="card">
@@ -167,8 +188,9 @@ INDEX_HTML = b"""<!doctype html>
     </div>
 
     <div class="card" style="grid-column: span 2;">
-      <h2>Inventory &amp; Front Shelves</h2>
+      <h2>Stock &amp; Shelves</h2>
       <div id="inventory"><div class="empty">Waiting for data...</div></div>
+      <div class="hint" id="stock_legend"></div>
     </div>
 
     <div class="card">
@@ -184,6 +206,11 @@ INDEX_HTML = b"""<!doctype html>
     <div class="card" style="grid-column: span 2;">
       <h2>Last Event</h2>
       <div id="last_event"><div class="empty">No events yet</div></div>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <h2>Last Failure</h2>
+      <div id="last_failure"><div class="empty">No failures</div></div>
     </div>
   </div>
 
@@ -215,38 +242,66 @@ INDEX_HTML = b"""<!doctype html>
       }).join('');
     }
 
-    function renderInventory(inventory, shelfCounts, baselines) {
+    function renderStock(data) {
       const el = document.getElementById('inventory');
+      const legend = document.getElementById('stock_legend');
+      const shelfCounts = data.shelf_counts || {};
+      const shelfCapacity = data.shelf_capacity || {};
+      const palletCounts = data.pallet_counts || {};
+      const rules = data.stock_rules || {};
+      const palletTarget = rules.pallet_target ?? 5;
+      const palletReorderBelow = rules.pallet_reorder_below ?? 3;
+
       const ids = new Set([
-        ...Object.keys(inventory || {}),
-        ...Object.keys(shelfCounts || {}),
+        ...Object.keys(shelfCounts),
+        ...Object.keys(palletCounts),
       ]);
       if (!ids.size) {
         el.innerHTML = '<div class="empty">Waiting for data...</div>';
+        legend.textContent = '';
         return;
       }
+
       const rows = [...ids].sort().map(id => {
-        const item = (inventory || {})[id] || {};
-        const front = item.front_stock ?? '-';
-        const storage = item.storage_stock ?? '-';
-        const threshold = item.threshold ?? '-';
-        const shelf = shelfCounts[id] ?? '-';
-        const base = baselines[id] ?? '-';
-        const low = typeof front === 'number' && typeof threshold === 'number' && front < threshold;
+        const cap = shelfCapacity[id] || {};
+        const shelfNow = shelfCounts[id] ?? cap.count ?? '-';
+        const shelfMax = cap.max ?? data.baseline_shelf_counts?.[id] ?? 9;
+        const shelfFull = typeof shelfNow === 'number' && typeof shelfMax === 'number' && shelfNow >= shelfMax;
+
+        const palletNow = palletCounts[id];
+        const palletText = typeof palletNow === 'number' ? `${palletNow} / ${palletTarget}` : '- / ' + palletTarget;
+        const palletLow = typeof palletNow === 'number' && palletNow < palletReorderBelow;
+
+        let status = 'OK';
+        let statusClass = 'ok';
+        if (palletLow) {
+          status = 'Reorder pallet';
+          statusClass = 'low';
+        } else if (shelfFull) {
+          status = 'Shelf full';
+          statusClass = 'full';
+        }
+
         return `<tr>
           <td>${id}</td>
-          <td class="${low ? 'low' : ''}">${front}</td>
-          <td>${storage}</td>
-          <td>${threshold}</td>
-          <td>${shelf} / ${base}</td>
+          <td class="${shelfFull ? 'full' : ''}">${shelfNow} / ${shelfMax}</td>
+          <td class="${palletLow ? 'low' : ''}">${palletText}</td>
+          <td class="${statusClass}">${status}</td>
         </tr>`;
       }).join('');
+
       el.innerHTML = `<table>
         <thead><tr>
-          <th>Product</th><th>Front</th><th>Storage</th><th>Threshold</th><th>Shelf (now/base)</th>
+          <th>Product</th>
+          <th>Front shelf (items / max)</th>
+          <th>Stock pallet (boxes / ${palletTarget})</th>
+          <th>Status</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
+      legend.textContent =
+        `Front shelf: item count from shelf monitoring (max 9). ` +
+        `Stock pallet: live boxes on warehouse pallet (reorder when below ${palletReorderBelow}).`;
     }
 
     function renderTaskTable(elId, tasks, columns) {
@@ -262,14 +317,17 @@ INDEX_HTML = b"""<!doctype html>
       el.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
     }
 
-    function renderEvent(ev) {
-      const el = document.getElementById('last_event');
+    function renderEvent(ev, elId, emptyText) {
+      const el = document.getElementById(elId);
       if (!ev) {
-        el.innerHTML = '<div class="empty">No events yet</div>';
+        el.innerHTML = `<div class="empty">${emptyText}</div>`;
         return;
       }
+      let cls = 'event';
+      if (ev.event === 'robot_failure') cls += ' event-failure';
+      else if (ev.event === 'threshold_check' || ev.event === 'threshold_skip') cls += ' event-threshold';
       const parts = Object.entries(ev).map(([k, v]) => `<strong>${k}</strong>: ${v}`).join(' | ');
-      el.innerHTML = `<div class="event">${parts}</div>`;
+      el.innerHTML = `<div class="${cls}">${parts}</div>`;
     }
 
     async function tick() {
@@ -281,7 +339,7 @@ INDEX_HTML = b"""<!doctype html>
         document.getElementById('source').textContent = data.source || '-';
         document.getElementById('ds').textContent = (data.ds === null || data.ds === undefined) ? '-' : data.ds;
         renderRobots(data.robots);
-        renderInventory(data.inventory, data.shelf_counts, data.baseline_shelf_counts);
+        renderStock(data);
         renderTaskTable('sort_queue', data.sort_queue, [
           {label: 'Seq', fmt: t => t.seq ?? '-'},
           {label: 'Product', fmt: t => t.product_id ?? '-'},
@@ -295,7 +353,8 @@ INDEX_HTML = b"""<!doctype html>
           {label: 'Status', fmt: t => t.status ?? 'pending'},
           {label: 'Reason', fmt: t => (t.reason || '').slice(0, 50)},
         ]);
-        renderEvent(data.last_event);
+        renderEvent(data.last_event, 'last_event', 'No events yet');
+        renderEvent(data.last_failure, 'last_failure', 'No failures');
       } catch (e) {
         // ignore transient errors
       }
@@ -316,6 +375,14 @@ def merge_state(current, incoming):
             nested = dict(merged.get(key) or {})
             nested.update(value)
             merged[key] = nested
+        elif key in ("pallet_counts", "shelf_counts", "shelf_capacity") and isinstance(
+            value, dict
+        ):
+            if not value:
+                continue
+            merged[key] = value
+        elif key == "last_failure" and value:
+            merged[key] = value
         elif value is not None:
             merged[key] = value
     if "sim_time" in incoming:

@@ -18,6 +18,7 @@ import product_routing
 import shelf_monitoring_logic as shelf_mon
 import sort_signal
 import motor_utils
+import dashboard_client
 import youbot_mecanum as mecanum
 import youbot_sorter_logic as logic
 
@@ -81,6 +82,7 @@ class YoubotSorterDemo:
         self.active_task = None
         self.completed_product_id = ""
         self.last_sorted_product_id = ""
+        self.sort_succeeded = False
         self.loaded_cube_defs = []
         self.carried_box_def = ""
         self.nav_steps = []
@@ -103,6 +105,12 @@ class YoubotSorterDemo:
             "[YOUBOT SORTER] IPC only: task_manager + stock_monitoring "
             "(pallet auto-scan disabled)"
         )
+        if self.robot.step(self.time_step) != -1:
+            motor_utils.snap_motors(
+                (self.robot.getDevice(name), 0.0)
+                for name in ("arm1", "arm2", "arm3", "arm4", "arm5")
+            )
+            motor_utils.snap_motors((grip, 0.0) for grip in self.gripper_motors)
 
     def task_trigger_source(self, parsed):
         triggered_by = (parsed.get("triggered_by") or "").strip()
@@ -329,10 +337,49 @@ class YoubotSorterDemo:
                 return None
             self.skip_sort_task(parsed, reason)
 
+    def fail_sort_task(self, reason):
+        if not self.active_task:
+            return
+        seq = int(self.active_task.get("seq", 0))
+        product_id = self.active_task.get("product_id", "?")
+        sim_time = self.robot.getTime()
+        print(f"[YOUBOT SORTER] Sort failed seq={seq} product={product_id}: {reason}")
+        sort_signal.mark_task_done(
+            self.project_root, seq, status="failed", sim_time=sim_time
+        )
+        self.last_sort_seq = max(self.last_sort_seq, seq)
+        dashboard_client.post_robot_failure(
+            self.project_root,
+            "sorter",
+            reason,
+            source="sorter",
+            sim_time=sim_time,
+            product_id=product_id,
+            seq=seq,
+        )
+        self.active_task = None
+        self.carried_box_def = ""
+        self.loaded_cube_defs = []
+        self.sort_succeeded = False
+        self.change_state("WAIT_SIGNAL")
+
+    def report_sorter_warning(self, reason):
+        dashboard_client.post_event(
+            self.project_root,
+            {
+                "event": "robot_warning",
+                "robot": "sorter",
+                "reason": reason,
+                "t": self.robot.getTime(),
+            },
+            source="sorter",
+        )
+
     def accept_sort_task(self, parsed, *, source_hint=""):
         self.signal_wait_logged = False
         self.last_sort_seq = parsed["seq"]
         self.active_task = parsed
+        self.sort_succeeded = False
         self.loaded_cube_defs = list(parsed.get("cube_defs") or [])
         task_type = parsed.get("task_type", "stock_pallet")
         reason = parsed.get("reason", "")
@@ -647,37 +694,47 @@ class YoubotSorterDemo:
             elif self.timer >= MAX_DRIVE_TIME:
                 self.stop_wheels()
                 print("[YOUBOT SORTER WARNING] Nav waypoint timeout, continuing")
+                self.report_sorter_warning("nav waypoint timeout")
                 self.on_nav_waypoint_reached()
 
         elif self.state == "LOAD_BOX_ON_PLATFORM":
             if self.supervisor_load_box_on_platform():
+                self.sort_succeeded = False
                 self.continue_to_deposit()
             elif self.timer >= self.act_steps(60):
-                print("[YOUBOT SORTER WARNING] Box load incomplete, continuing route")
-                self.continue_to_deposit()
+                print("[YOUBOT SORTER WARNING] Box load incomplete")
+                self.fail_sort_task("box load incomplete — box missing or not on platform")
 
         elif self.state == "SUPERVISOR_PLACE":
             if self.supervisor_unpack_box_to_shelf():
+                self.sort_succeeded = True
                 self.change_state("UPDATE_INVENTORY")
             elif self.timer >= self.act_steps(60):
-                print("[YOUBOT SORTER WARNING] Shelf unpack incomplete, updating inventory")
-                self.change_state("UPDATE_INVENTORY")
+                print("[YOUBOT SORTER WARNING] Shelf unpack incomplete")
+                self.fail_sort_task("shelf unpack incomplete")
 
         elif self.state == "UPDATE_INVENTORY":
-            self.update_inventory()
-            self.leave_stock_visible_on_shelf()
-            if self.active_task:
-                sort_signal.mark_task_done(
-                    self.project_root, self.active_task["seq"]
+            if self.sort_succeeded:
+                self.update_inventory()
+                self.leave_stock_visible_on_shelf()
+                if self.active_task:
+                    sort_signal.mark_task_done(
+                        self.project_root, self.active_task["seq"]
+                    )
+                self.completed_product_id = (
+                    self.active_task["product_id"] if self.active_task else ""
                 )
-            self.completed_product_id = (
-                self.active_task["product_id"] if self.active_task else ""
-            )
-            self.last_sorted_product_id = self.completed_product_id
+                self.last_sorted_product_id = self.completed_product_id
+            else:
+                if self.active_task:
+                    self.fail_sort_task("sort did not complete placement")
+                    self.timer += 1
+                    return
             self.loaded_cube_defs = []
             self.carried_box_def = ""
+            completed = self.completed_product_id
             self.active_task = None
-            self.begin_post_deposit_navigation(self.completed_product_id)
+            self.begin_post_deposit_navigation(completed)
 
         self.timer += 1
 

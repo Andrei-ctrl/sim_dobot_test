@@ -3,6 +3,8 @@
 import json
 import os
 import sys
+import urllib.error
+import urllib.request
 
 from controller import Supervisor
 
@@ -14,10 +16,14 @@ for path in (_CONTROLLERS_DIR, _SHELF_MON_DIR):
 
 import box_routing  # noqa: E402
 import product_routing  # noqa: E402
+import restocking_task_manager as task_mgr  # noqa: E402
 import shelf_monitoring_logic as shelf_mon  # noqa: E402
 import sort_signal  # noqa: E402
 
 TIME_STEP = 32
+PUBLISH_EVERY_STEPS = 48
+DASHBOARD_URL = "http://127.0.0.1:8000/update"
+SEND_TO_DASHBOARD = True
 PROCESSED_FILENAME = "stock_processed.json"
 SENSOR_NAMES = (
     "stock_monitoring_beer",
@@ -35,6 +41,7 @@ class StockMonitoring:
         self.reset_processed_file()
         self.wait_log_seen = set()
         sort_signal.reset_signal(self.project_root)
+        self.step = 0
         self.sensors = {}
         for name in SENSOR_NAMES:
             device = self.robot.getDevice(name)
@@ -141,6 +148,51 @@ class StockMonitoring:
             f"(sort seq={payload['seq']}, shelf={route['shelf_name']})"
         )
 
+    def count_pallet_boxes_by_product(self):
+        counts = {
+            product_routing.route_for_pallet_def(pallet_def)["product_id"]: 0
+            for pallet_def in product_routing.iter_pallet_defs()
+        }
+        for box_def, box_pos in self.iter_boxes():
+            pallet_def = self.pallet_for_box(box_pos)
+            if pallet_def is None:
+                continue
+            product_id = product_routing.route_for_pallet_def(pallet_def)["product_id"]
+            counts[product_id] = counts.get(product_id, 0) + 1
+        return counts
+
+    def publish_pallet_counts(self):
+        sim_time = self.robot.getTime()
+        counts = self.count_pallet_boxes_by_product()
+        rules = task_mgr.stock_rules_payload()
+        task_mgr.save_pallet_counts(
+            self.project_root,
+            counts,
+            sim_time,
+            source="stock_monitoring",
+        )
+        if not SEND_TO_DASHBOARD:
+            return
+        body = json.dumps(
+            {
+                "source": "stock_monitoring",
+                "sim_time": sim_time,
+                "pallet_counts": counts,
+                "stock_rules": rules,
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            DASHBOARD_URL,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=0.4) as response:
+                response.read()
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+
     def check_pallets(self):
         for box_def, box_pos in self.iter_boxes():
             if box_def in self.processed:
@@ -157,6 +209,9 @@ class StockMonitoring:
     def run(self):
         while self.robot.step(TIME_STEP) != -1:
             self.check_pallets()
+            if self.step % PUBLISH_EVERY_STEPS == 0:
+                self.publish_pallet_counts()
+            self.step += 1
 
 
 if __name__ == "__main__":

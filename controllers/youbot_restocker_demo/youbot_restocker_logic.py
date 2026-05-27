@@ -36,6 +36,8 @@ SENSOR_MAX_VALID = 3200  # above = arm/gripper self-hit, not a box
 
 # Delay before IPR spawns the next box after conveyor scanner detection.
 SPAWN_DELAY_SEC = 50.0
+# Task-manager pallet orders spawn right away; spacing is handled by the supervisor.
+SPAWN_TASK_MANAGER_DELAY_SEC = 0.0
 
 # 0 = unlimited simultaneous boxes (cap disabled).
 MAX_LIVE_BOXES = 0
@@ -45,6 +47,8 @@ SCANNER_RADIUS = 0.8
 NEAR_CONVEYOR_RADIUS = 0.45
 ROBOT_BOX_REACH = 0.85
 SEARCH_DELAY_SEC = 100.0
+# Physics settle before supervisor verifies pallet count increased after release.
+RESTOCK_VERIFY_SETTLE_STEPS = 120
 
 # Distance sensor lookup (YoubotBoxGrip arm5 IR sensor, value -> meters).
 SENSOR_LOOKUP = (
@@ -443,26 +447,27 @@ def format_detection_log(diag, prefix="[YOUBOT RESTOCKER DIAG]"):
             f"  -> PICK READY via stage {diag['pick_stage']} ({diag['pick_def']})"
         )
     else:
-        lines.append("  -> NO PICK (see box details below)")
-    for box in diag["boxes"]:
-        pos = box["pos"]
-        if box.get("status") == "completed":
-            lines.append(f"  box {box['def']}: COMPLETED (skipped)")
-            continue
-        flags = []
-        if box.get("at_fixed_slot"):
-            flags.append("FIXED_SLOT")
-        elif box.get("at_pick_station"):
-            flags.append("PICK_ZONE")
-        if box.get("in_scanner_zone"):
-            flags.append("SCANNER_ZONE")
-        flag_str = ",".join(flags) if flags else "no zone"
-        dist_slot = box.get("dist_to_fixed_slot", distance_to_fixed_pick(pos))
-        dist_robot = box["distance_to_robot"]
-        lines.append(
-            f"  box {box['def']} @ ({pos[0]:.3f},{pos[1]:.3f},{pos[2]:.3f}) "
-            f"[{flag_str}] dist_slot={dist_slot:.3f}m dist_robot={dist_robot:.2f}m"
-        )
-        if box["pick_reject_reasons"]:
-            lines.append(f"    pick reject: {'; '.join(box['pick_reject_reasons'])}")
+        lines.append("  -> NO PICK")
+    # Per-box position spam disabled — too noisy when many SPAWNED_BOX_* exist on pallets.
+    # for box in diag["boxes"]:
+    #     pos = box["pos"]
+    #     if box.get("status") == "completed":
+    #         lines.append(f"  box {box['def']}: COMPLETED (skipped)")
+    #         continue
+    #     flags = []
+    #     if box.get("at_fixed_slot"):
+    #         flags.append("FIXED_SLOT")
+    #     elif box.get("at_pick_station"):
+    #         flags.append("PICK_ZONE")
+    #     if box.get("in_scanner_zone"):
+    #         flags.append("SCANNER_ZONE")
+    #     flag_str = ",".join(flags) if flags else "no zone"
+    #     dist_slot = box.get("dist_to_fixed_slot", distance_to_fixed_pick(pos))
+    #     dist_robot = box["distance_to_robot"]
+    #     lines.append(
+    #         f"  box {box['def']} @ ({pos[0]:.3f},{pos[1]:.3f},{pos[2]:.3f}) "
+    #         f"[{flag_str}] dist_slot={dist_slot:.3f}m dist_robot={dist_robot:.2f}m"
+    #     )
+    #     if box["pick_reject_reasons"]:
+    #         lines.append(f"    pick reject: {'; '.join(box['pick_reject_reasons'])}")
     return "\n".join(lines)

@@ -58,6 +58,55 @@ class TestPalletStockLogic(unittest.TestCase):
 
         self.assertEqual(mgr.count_boxes_on_pallet(get_from_def, pallet), 1)
 
+    def test_verify_restock_increase(self):
+        pallet = "MILK_STOCK"
+        px, py, _ = product_routing.pallet_translation(pallet)
+        counts = {"SPAWNED_BOX_0": False, "SPAWNED_BOX_1": False}
+
+        def get_from_def(name):
+            if name not in counts:
+                return None
+            node = mock.MagicMock()
+            if counts[name]:
+                node.getPosition.return_value = [px, py, 0.22]
+            else:
+                node.getPosition.return_value = [0.0, 0.0, 0.22]
+            return node
+
+        ok, after, delta = mgr.verify_restock_increase(get_from_def, pallet, 0)
+        self.assertFalse(ok)
+        self.assertEqual(after, 0)
+        self.assertEqual(delta, 0)
+
+        counts["SPAWNED_BOX_1"] = True
+        ok, after, delta = mgr.verify_restock_increase(get_from_def, pallet, 0)
+        self.assertTrue(ok)
+        self.assertEqual(after, 1)
+        self.assertEqual(delta, 1)
+
+    def test_box_delivered_to_pallet(self):
+        pallet = "BEER_STOCK"
+        px, py, _ = product_routing.pallet_translation(pallet)
+
+        def get_from_def(name):
+            if name != "SPAWNED_BOX_0":
+                return None
+            node = mock.MagicMock()
+            node.getPosition.return_value = [px, py, 0.22]
+            return node
+
+        ok, reason = mgr.box_delivered_to_pallet(get_from_def, "SPAWNED_BOX_0", pallet)
+        self.assertTrue(ok)
+        self.assertEqual(reason, "ok")
+
+        ok, reason = mgr.box_delivered_to_pallet(get_from_def, "SPAWNED_BOX_0", "MILK_STOCK")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "not_on_pallet")
+
+        ok, reason = mgr.box_delivered_to_pallet(get_from_def, "SPAWNED_BOX_9", pallet)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "box_removed")
+
     def test_replenish_when_below_min(self):
         def get_from_def(_name):
             return None
@@ -99,6 +148,69 @@ class TestPalletStockLogic(unittest.TestCase):
             if action["product_id"] == "BEER_BOTTLE"
         ]
         self.assertEqual(actions, [])
+
+    def test_sync_clears_stale_replenish_when_full(self):
+        pallet = "MILK_STOCK"
+        px, py, _ = product_routing.pallet_translation(pallet)
+
+        def get_from_def(name):
+            index = int(name.rsplit("_", 1)[-1])
+            if index >= 5:
+                return None
+            node = mock.MagicMock()
+            node.getField.return_value.getSFVec3f.return_value = [px, py, 0.22 + index * 0.05]
+            return node
+
+        state = {
+            "pallet_replenish_target": {"MILK": 5},
+            "pallet_ever_full": {"MILK": True},
+            "last_pallet_spawn_time": {"MILK": 0.032},
+        }
+        mgr.sync_pallet_stock_state(get_from_def, state)
+        self.assertNotIn("MILK", state["pallet_replenish_target"])
+        self.assertNotIn("MILK", state["last_pallet_spawn_time"])
+        actions = mgr.evaluate_pallet_stock_needs(
+            ".",
+            get_from_def,
+            sim_time=100.0,
+            state=state,
+        )
+        self.assertEqual(actions, [])
+
+    def test_no_replenish_during_warmup(self):
+        state = {"pallet_ever_full": {"MILK": True}, "pallet_replenish_target": {"MILK": 5}}
+
+        def get_from_def(_name):
+            return None
+
+        actions = mgr.evaluate_pallet_stock_needs(
+            ".",
+            get_from_def,
+            sim_time=0.5,
+            state=state,
+        )
+        self.assertEqual(actions, [])
+
+    def test_first_spawn_allowed_without_prior_scan(self):
+        state = {"pallet_ever_full": {"CHEESE": True}, "pallet_replenish_target": {"CHEESE": 5}}
+        self.assertTrue(mgr.pallet_spawn_cooldown_elapsed(state, "CHEESE", sim_time=10.0))
+
+    def test_blocks_while_awaiting_conveyor_scan(self):
+        state = {
+            "pallet_ever_full": {"CHEESE": True},
+            "awaiting_conveyor_scan": {"CHEESE": True},
+            "last_pallet_scan_time": {"CHEESE": 5.0},
+        }
+        self.assertFalse(mgr.pallet_spawn_cooldown_elapsed(state, "CHEESE", sim_time=60.0))
+
+    def test_requires_fifty_seconds_after_scan(self):
+        state = {
+            "pallet_ever_full": {"CHEESE": True},
+            "awaiting_conveyor_scan": {"CHEESE": False},
+            "last_pallet_scan_time": {"CHEESE": 100.0},
+        }
+        self.assertFalse(mgr.pallet_spawn_cooldown_elapsed(state, "CHEESE", sim_time=140.0))
+        self.assertTrue(mgr.pallet_spawn_cooldown_elapsed(state, "CHEESE", sim_time=150.0))
 
 
 class TestEvaluateRestockNeeds(unittest.TestCase):
@@ -171,6 +283,25 @@ class TestEvaluateRestockNeeds(unittest.TestCase):
             state={"last_trigger_time": {"BEER_BOTTLE": 0.0}},
         )
         self.assertEqual(actions, [])
+
+    def test_sort_on_inventory_threshold_without_full_row(self):
+        inv = dict(self.inventory)
+        inv["BEER_BOTTLE"] = {
+            "front_stock": 16,
+            "threshold": 20,
+            "storage_stock": 10,
+        }
+        actions = mgr.evaluate_restock_needs(
+            self.tmp,
+            shelf_counts={"BEER_BOTTLE": 8},
+            baseline_counts={"BEER_BOTTLE": 9},
+            inventory=inv,
+            sim_time=100.0,
+            state={"last_trigger_time": {}},
+        )
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["kind"], "sort")
+        self.assertIn("threshold", actions[0]["reason"])
 
 
 class TestTaskCreation(unittest.TestCase):

@@ -45,8 +45,11 @@ def write_assignment(project_root, box_def, route, sim_time, *, box_uid=""):
     return data[box_def]
 
 
-def assign_box(project_root, box_def, sim_time):
-    route = product_routing.route_for_box_def(box_def)
+def assign_box(project_root, box_def, sim_time, *, product_id=None):
+    existing = read_assignment(project_root, box_def)
+    if existing is not None:
+        return existing
+    route = product_routing.route_for_box_def(box_def, product_id=product_id)
     return write_assignment(project_root, box_def, route, sim_time)
 
 

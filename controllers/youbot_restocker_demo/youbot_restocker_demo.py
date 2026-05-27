@@ -13,8 +13,13 @@ for path in (_LOGIC_DIR, _CONTROLLERS_DIR, _SORTER_DIR):
 
 import youbot_restocker_logic as detection
 import box_routing
+import motor_utils
+import dashboard_client
 import product_routing
 import youbot_mecanum as mecanum
+import conveyor_intrusion
+import restocking_task_manager as task_mgr
+import conveyor_unknown_signal
 
 ACTION_SPEED = 1.0
 
@@ -66,6 +71,25 @@ WHEEL_RADIUS = mecanum.WHEEL_RADIUS
 WHEEL_MAX_VEL = mecanum.WHEEL_MAX_VEL
 TURN_OMEGA = 0.85 * ACTION_SPEED
 STRAFE_SPEED = 0.35 * ACTION_SPEED
+
+PICK_CYCLE_STATES = frozenset(
+    {
+        "OPEN_GRIP",
+        "PRE_PICK",
+        "APPROACH",
+        "DESCEND",
+        "CLOSE",
+        "SETTLE",
+        "LIFT",
+        "CARRY",
+        "TURN_180",
+        "DRIVE_TO_PALLET",
+        "OVER_PALLET",
+        "PLACE_ON_PALLET",
+        "RELEASE_ON_PALLET",
+        "VERIFY_RESTOCK",
+    }
+)
 
 class YoubotRestockerDemo:
     def __init__(self):
@@ -164,6 +188,14 @@ class YoubotRestockerDemo:
         self.search_allowed = False
         self.conveyor_detect_time = None
         self.home_pose_logged = False
+        self.conveyor_intrusion_key = None
+        self.conveyor_blocked = False
+        self.restock_verify_pallet = None
+        self.restock_count_before = 0
+        self.restock_count_before_release = 0
+        self.restock_pending_box_def = None
+        self.restock_cycle_active = False
+        self.tracked_pick_box_def = None
 
     def setup_hardcoded_pick_poses(self):
         """Use calibrated REF_PICK only — no box/sensor-based pose adjustment."""
@@ -203,7 +235,7 @@ class YoubotRestockerDemo:
         for motor, value in zip(self.arms, self.clamp_pose(values)):
             if motor is not None:
                 motor.setVelocity(ARM_PICK_VELOCITY)
-                motor.setPosition(value)
+                motor_utils.set_joint_position(motor, value)
 
     def set_gripper(self, value, closing=False):
         safe = max(0.0, min(GRIPPER_MAX, value))
@@ -211,14 +243,10 @@ class YoubotRestockerDemo:
         for gripper in (self.gripper_left, self.gripper_right):
             if gripper is None:
                 continue
-            lo = gripper.getMinPosition()
-            hi = gripper.getMaxPosition()
-            if math.isfinite(lo) and math.isfinite(hi):
-                safe = max(lo, min(hi, safe))
             if velocity is not None:
                 max_vel = gripper.getMaxVelocity()
                 gripper.setVelocity(min(max_vel, velocity) if max_vel > 0 else velocity)
-            gripper.setPosition(safe)
+            motor_utils.set_joint_position(gripper, safe)
 
     def stop_wheels(self):
         for wheel in self.wheels:
@@ -440,6 +468,56 @@ class YoubotRestockerDemo:
             self.set_arm(self.conveyor_idle_arm_pose())
             self.set_gripper(self.gripper_open)
 
+    def report_failure(self, reason, **fields):
+        print(f"[YOUBOT RESTOCKER] RESTOCK FAILURE → dashboard: {reason}")
+        posted = dashboard_client.post_robot_failure(
+            self.project_root,
+            "restocker",
+            reason,
+            source="restocker",
+            sim_time=self.robot.getTime(),
+            **fields,
+        )
+        if not posted:
+            print("[YOUBOT RESTOCKER WARNING] Dashboard POST failed (is dashboard_server.py running?)")
+
+    def box_def_alive(self, box_def):
+        if not box_def:
+            return False
+        node = self.robot.getFromDef(box_def)
+        if node is None:
+            return False
+        try:
+            pos = product_routing.node_world_xyz(node)
+            if pos is None:
+                return False
+            if abs(pos[0]) > 500 or abs(pos[1]) > 500:
+                return False
+            return True
+        except (AttributeError, RuntimeError, TypeError):
+            return False
+
+    def box_near_robot(self, box_def, max_dist=1.35):
+        node = self.robot.getFromDef(box_def)
+        if node is None:
+            return False
+        pos = product_routing.node_world_xyz(node)
+        if pos is None:
+            return False
+        rx, ry = self.get_robot_xy()
+        return math.hypot(pos[0] - rx, pos[1] - ry) <= max_dist
+
+    def active_restock_box_def(self):
+        return (
+            self.restock_pending_box_def
+            or self.tracked_pick_box_def
+            or self.active_box_def
+        )
+
+    def end_restock_cycle(self):
+        self.restock_cycle_active = False
+        self.tracked_pick_box_def = None
+
     def snap_to_home_pose(self, log=True):
         """Align exactly to the calibrated conveyor home pose after wheel navigation."""
         self.stop_wheels()
@@ -595,6 +673,14 @@ class YoubotRestockerDemo:
             box_routing.assign_box(self.project_root, box_def, self.robot.getTime())
         routing = self.load_box_routing(box_def)
         self.active_target_pallet = routing["target_pallet"]
+        self.restock_verify_pallet = routing["target_pallet"]
+        self.restock_count_before = task_mgr.count_boxes_on_pallet(
+            self.robot.getFromDef,
+            self.restock_verify_pallet,
+        )
+        self.restock_pending_box_def = box_def
+        self.tracked_pick_box_def = box_def
+        self.restock_cycle_active = True
         self.pick_count += 1
         self.search_allowed = False
         self.conveyor_detect_time = None
@@ -607,12 +693,247 @@ class YoubotRestockerDemo:
         print(
             f"[YOUBOT RESTOCKER] Stage {stage} - starting pick cycle for {box_def} "
             f"at ({box_pos[0]:.3f}, {box_pos[1]:.3f}, {box_pos[2]:.3f}) "
-            f"→ {self.active_target_pallet}"
+            f"→ {self.active_target_pallet} "
+            f"(pallet boxes before={self.restock_count_before})"
         )
         self.change_state("OPEN_GRIP")
 
+    def verify_restock_placement(self):
+        """Supervisor check: carried box must exist on the routed pallet (+ count +1)."""
+        pallet_def = self.restock_verify_pallet or self.active_target_pallet
+        box_def = self.active_restock_box_def()
+        count_before = self.restock_count_before_release
+        route = product_routing.route_for_pallet_def(pallet_def)
+        product_id = route.get("product_id", "")
+
+        delivered, reason = task_mgr.box_delivered_to_pallet(
+            self.robot.getFromDef,
+            box_def,
+            pallet_def,
+        )
+        count_after = task_mgr.count_boxes_on_pallet(
+            self.robot.getFromDef,
+            pallet_def,
+        )
+        delta = count_after - int(count_before)
+
+        if not delivered:
+            reason_text = {
+                "box_removed": "box removed before pallet drop",
+                "not_on_pallet": "box not on target pallet after release",
+                "missing_box_def": "restock placement failed: missing box reference",
+                "no_position": "box position unavailable after release",
+            }.get(reason, f"restock placement failed: {reason}")
+            print(
+                f"[YOUBOT RESTOCKER] RESTOCK FAILURE on {pallet_def}: {reason_text} "
+                f"(box={box_def}, count {count_before} → {count_after})"
+            )
+            self.report_failure(
+                reason_text,
+                box_def=box_def or "",
+                target_pallet=pallet_def,
+                product_id=product_id,
+                count_before=count_before,
+                count_after=count_after,
+                delta=delta,
+            )
+            self.end_restock_cycle()
+            return False
+
+        if delta < 1:
+            print(
+                f"[YOUBOT RESTOCKER] RESTOCK FAILURE on {pallet_def}: "
+                f"pallet count did not increase ({count_before} → {count_after})"
+            )
+            self.report_failure(
+                "restock placement failed: pallet count did not increase",
+                box_def=box_def or "",
+                target_pallet=pallet_def,
+                product_id=product_id,
+                count_before=count_before,
+                count_after=count_after,
+                delta=delta,
+            )
+            self.end_restock_cycle()
+            return False
+
+        print(
+            f"[YOUBOT RESTOCKER] Restock verified on {pallet_def}: "
+            f"{count_before} → {count_after} (+{delta}), box={box_def} on pallet"
+        )
+        pallet_counts = task_mgr.pallet_counts_by_product(self.robot.getFromDef)
+        task_mgr.save_pallet_counts(
+            self.project_root,
+            pallet_counts,
+            self.robot.getTime(),
+            source="restocker",
+        )
+        dashboard_client.post_event(
+            self.project_root,
+            {
+                "event": "restock_complete",
+                "robot": "restocker",
+                "t": self.robot.getTime(),
+                "box_def": box_def or "",
+                "target_pallet": pallet_def,
+                "product_id": product_id,
+                "count_before": count_before,
+                "count_after": count_after,
+            },
+            source="restocker",
+            extra={"pallet_counts": pallet_counts},
+        )
+        if box_def:
+            self.completed_boxes.add(box_def)
+        return True
+
+    def abort_restock_failure(self, reason, **fields):
+        print(f"[YOUBOT RESTOCKER] RESTOCK FAILURE: {reason}")
+        self.report_failure(reason, **fields)
+        self.end_restock_cycle()
+        self.restock_pending_box_def = None
+        self.active_box_def = None
+        self.active_box_pos = None
+        self.restock_verify_pallet = None
+        self.restock_count_before = 0
+        self.restock_count_before_release = 0
+        self.waiting_for_box = True
+        self.reset_wait_for_box_state()
+        self.change_state("HOME")
+
+    def monitor_pending_conveyor_box(self):
+        """Expected upstream box vanished before the restocker could pick it."""
+        box_def = self.pending_box_def
+        if not box_def or self.restock_cycle_active:
+            return False
+        if self.state not in ("WAIT_BOX", "SEARCH_AT_CONVEYOR"):
+            return False
+        if box_def in self.completed_boxes:
+            return False
+        if self.box_def_alive(box_def):
+            return False
+        print(
+            f"[YOUBOT RESTOCKER] RESTOCK FAILURE: tracked conveyor box "
+            f"{box_def} removed before pick"
+        )
+        self.report_failure(
+            "expected restock box removed before pick",
+            box_def=box_def,
+            phase=self.state,
+        )
+        self.pending_box_def = None
+        self.conveyor_box_detected = False
+        self.conveyor_detect_time = None
+        return True
+
+    def monitor_restock_integrity(self):
+        if self.monitor_pending_conveyor_box():
+            return True
+
+        if not self.restock_cycle_active:
+            return False
+
+        box_def = self.active_restock_box_def()
+        if not box_def:
+            return False
+
+        if not self.box_def_alive(box_def):
+            self.abort_restock_failure(
+                "box removed before pallet drop",
+                box_def=box_def,
+                phase=self.state,
+                target_pallet=self.restock_verify_pallet or self.active_target_pallet,
+            )
+            return True
+
+        carry_states = (
+            "LIFT",
+            "CARRY",
+            "TURN_180",
+            "DRIVE_TO_PALLET",
+            "OVER_PALLET",
+            "PLACE_ON_PALLET",
+        )
+        if self.state in carry_states and not self.box_near_robot(box_def):
+            self.abort_restock_failure(
+                "box lost during carry (not with robot)",
+                box_def=box_def,
+                phase=self.state,
+                target_pallet=self.restock_verify_pallet or self.active_target_pallet,
+            )
+            return True
+
+        return False
+
+    def monitor_pick_cycle_integrity(self):
+        return self.monitor_restock_integrity()
+
+    def check_conveyor_intrusion(self):
+        """Block restock while a foreign object flagged at the upstream scanner remains."""
+        signal = conveyor_unknown_signal.read_signal(self.project_root)
+        if signal and signal.get("active"):
+            if conveyor_intrusion.unknown_still_present(
+                self.children,
+                signal,
+                self.robot.getFromDef,
+            ):
+                self.conveyor_blocked = True
+                label = signal.get("label") or signal.get("object_name") or "unknown"
+                if label != self.conveyor_intrusion_key:
+                    self.conveyor_intrusion_key = label
+                    print(
+                        f"[YOUBOT RESTOCKER] Conveyor blocked — unknown object "
+                        f"passed scanner: {label}"
+                    )
+                return True
+            conveyor_unknown_signal.clear_signal(self.project_root)
+
+        live_unknowns = conveyor_intrusion.find_unknown_at_scanner(
+            self.children,
+            self.robot.getFromDef,
+            detection.SCANNER_XY,
+            detection.SCANNER_RADIUS,
+        )
+        if live_unknowns:
+            obj = live_unknowns[0]
+            key = conveyor_intrusion.object_key(obj)
+            self.conveyor_blocked = True
+            if key != self.conveyor_intrusion_key:
+                self.conveyor_intrusion_key = key
+                label = conveyor_intrusion.format_object_label(obj)
+                conveyor_unknown_signal.write_signal(
+                    self.project_root,
+                    obj,
+                    self.robot.getTime(),
+                    scanner_xy=detection.SCANNER_XY,
+                )
+                print(
+                    f"[YOUBOT RESTOCKER EXCEPTION] Unknown object at conveyor scanner: "
+                    f"{label}"
+                )
+                self.report_failure(
+                    f"unknown object at conveyor scanner: {label}",
+                    object_name=obj.get("name") or "",
+                    object_type=obj.get("type_name") or "",
+                    position=obj.get("position"),
+                    zone="upstream_scanner",
+                )
+            return True
+
+        self.conveyor_intrusion_key = None
+        self.conveyor_blocked = False
+        return False
+
     def run_box_scanners(self):
         """Poll stage-1 zone every step while waiting; log when box enters pick zone."""
+        if self.check_conveyor_intrusion():
+            if self.timer % DIAG_LOG_INTERVAL == 0:
+                print(
+                    "[YOUBOT RESTOCKER] Conveyor blocked by unknown object — "
+                    "waiting for manual removal"
+                )
+            return
+
         triggered, box_def, pos = self.conveyor_sensor_triggered()
         if triggered and box_def not in self.completed_boxes:
             if not self.conveyor_box_detected or self.pending_box_def != box_def:
@@ -653,6 +974,9 @@ class YoubotRestockerDemo:
 
     def try_start_pick_cycle(self):
         """Start pick when a box is ready (at conveyor / during search)."""
+        if self.conveyor_blocked or self.check_conveyor_intrusion():
+            return
+
         diag = self.get_detection_snapshot()
         if not diag["should_pick"]:
             return
@@ -663,6 +987,7 @@ class YoubotRestockerDemo:
         box = self.robot.getFromDef(box_def) if box_def else None
         if box is None:
             print(f"[YOUBOT RESTOCKER WARNING] Pick target {box_def} missing from world")
+            self.report_failure("pick target missing from world", box_def=box_def)
             self.log_detection_snapshot("pick target missing")
             return
 
@@ -741,6 +1066,9 @@ class YoubotRestockerDemo:
         ])
 
     def run_state(self):
+        if self.monitor_pick_cycle_integrity():
+            return
+
         if self.waiting_for_box and self.state in ("WAIT_BOX", "SEARCH_AT_CONVEYOR"):
             self.run_box_scanners()
 
@@ -813,8 +1141,22 @@ class YoubotRestockerDemo:
             self.set_arm(self.pick_pose)
             self.set_gripper(self.gripper_close, closing=True)
             if self.timer >= self.pick_steps(120):
-                print("[YOUBOT RESTOCKER] Grip settled, lifting box")
-                self.change_state("LIFT")
+                box_def = self.active_restock_box_def()
+                if not self.box_def_alive(box_def):
+                    self.abort_restock_failure(
+                        "box removed before lift from conveyor",
+                        box_def=box_def or "",
+                        phase=self.state,
+                    )
+                elif not self.box_near_robot(box_def, max_dist=1.05):
+                    self.abort_restock_failure(
+                        "box not gripped after close (still on conveyor)",
+                        box_def=box_def,
+                        phase=self.state,
+                    )
+                else:
+                    print("[YOUBOT RESTOCKER] Grip settled, lifting box")
+                    self.change_state("LIFT")
 
         elif self.state == "LIFT":
             dur = self.pick_steps(90)
@@ -839,7 +1181,7 @@ class YoubotRestockerDemo:
                     self.drive_target[1] - robot_y,
                 )
                 print(
-                    f"[YOUBOT RESTOCKER] 180 turn then drive to pallet "
+                    f"[YOUBOT RESTOCKER] 180 turn then drive to {self.active_target_pallet} "
                     f"({self.drive_target[0]:.2f}, {self.drive_target[1]:.2f}), "
                     f"distance={distance:.2f} m"
                 )
@@ -857,6 +1199,7 @@ class YoubotRestockerDemo:
             elif self.timer >= MAX_TURN_TIME:
                 self.stop_wheels()
                 print("[YOUBOT RESTOCKER WARNING] Turn timeout, driving anyway")
+                self.report_failure("turn timeout at pallet approach")
                 self.change_state("DRIVE_TO_PALLET")
 
         elif self.state == "DRIVE_TO_PALLET":
@@ -868,6 +1211,7 @@ class YoubotRestockerDemo:
             elif self.timer >= MAX_DRIVE_TIME:
                 self.stop_wheels()
                 print("[YOUBOT RESTOCKER WARNING] Drive timeout, attempting place")
+                self.report_failure("drive timeout to stock pallet")
                 self.change_state("OVER_PALLET")
 
         elif self.state == "OVER_PALLET":
@@ -889,25 +1233,51 @@ class YoubotRestockerDemo:
                 self.change_state("RELEASE_ON_PALLET")
 
         elif self.state == "RELEASE_ON_PALLET":
+            if self.timer == 0:
+                pallet = self.restock_verify_pallet or self.active_target_pallet
+                self.restock_count_before_release = task_mgr.count_boxes_on_pallet(
+                    self.robot.getFromDef,
+                    pallet,
+                )
             self.set_arm(self.place_on_pallet_pose)
             dur = self.act_steps(60)
             open_progress = min(1.0, self.timer / dur)
             grip = self.gripper_close + (self.gripper_open - self.gripper_close) * open_progress
             self.set_gripper(grip)
             if self.timer >= dur:
-                delivered_box = self.active_box_def
-                if delivered_box is not None:
-                    self.completed_boxes.add(delivered_box)
+                delivered_box = self.restock_pending_box_def or self.active_box_def
                 print(
-                    f"[YOUBOT RESTOCKER] Box left on {self.active_target_pallet} "
-                    f"({delivered_box})"
+                    f"[YOUBOT RESTOCKER] Box released toward {self.active_target_pallet} "
+                    f"({delivered_box}), verifying pallet count"
                 )
-                self.active_target_pallet = product_routing.DEFAULT_PALLET_DEF
-                self.active_box_def = None
-                self.active_box_pos = None
-                self.waiting_for_box = True
-                self.reset_wait_for_box_state()
-                self.change_state("HOME")
+                self.change_state("VERIFY_RESTOCK")
+
+        elif self.state == "VERIFY_RESTOCK":
+            self.set_arm(self.place_on_pallet_pose)
+            self.set_gripper(self.gripper_open)
+            box_def = self.active_restock_box_def()
+            if not self.box_def_alive(box_def):
+                self.abort_restock_failure(
+                    "box removed before pallet drop",
+                    box_def=box_def or "",
+                    phase=self.state,
+                    target_pallet=self.restock_verify_pallet or self.active_target_pallet,
+                )
+            else:
+                settle = self.act_steps(detection.RESTOCK_VERIFY_SETTLE_STEPS)
+                if self.timer >= settle:
+                    self.verify_restock_placement()
+                    self.end_restock_cycle()
+                    self.active_target_pallet = product_routing.DEFAULT_PALLET_DEF
+                    self.active_box_def = None
+                    self.active_box_pos = None
+                    self.restock_verify_pallet = None
+                    self.restock_pending_box_def = None
+                    self.restock_count_before = 0
+                    self.restock_count_before_release = 0
+                    self.waiting_for_box = True
+                    self.reset_wait_for_box_state()
+                    self.change_state("HOME")
 
         elif self.state == "HOME":
             dur = self.act_steps(100)
@@ -945,6 +1315,7 @@ class YoubotRestockerDemo:
             elif self.timer >= MAX_RETURN_DRIVE_TIME:
                 self.stop_wheels()
                 print("[YOUBOT RESTOCKER WARNING] Return drive timeout, aligning heading")
+                self.report_failure("return drive timeout to conveyor")
                 self.change_state("TURN_TO_PICKUP")
 
         elif self.state == "TURN_TO_PICKUP":
@@ -967,6 +1338,7 @@ class YoubotRestockerDemo:
                 self.stop_wheels()
                 self.snap_to_home_pose()
                 print("[YOUBOT RESTOCKER WARNING] Pick heading turn timeout")
+                self.report_failure("pick heading turn timeout")
                 self.waiting_for_box = True
                 if self.should_start_search():
                     self.change_state("SEARCH_AT_CONVEYOR")

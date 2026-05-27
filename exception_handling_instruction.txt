@@ -1,0 +1,196 @@
+================================================================================
+EXCEPTION HANDLING — worlds/exception_handling.wbt
+================================================================================
+
+See instruction.txt for overview of all three worlds (exception_handling,
+triger_threshold, truck_delivery) and shared setup steps.
+
+Use this world to test failures, threshold skips, and the
+dashboard "Last Failure" / "Last Event" panels.
+
+Setup
+-----
+  1. python dashboard_server.py     →  http://127.0.0.1:8000
+  2. Webots: open worlds/exception_handling.wbt
+  3. Play
+
+Controllers in this world (same stack as triger_threshold and truck_delivery):
+  youbot_sorter_demo, youbot_restocker_demo, ipr_pick_demo, scanner_controller,
+  stock_monitoring, shelf_monitoring, restocking_task_manager_demo
+
+Data files to watch:
+  data/last_failure.json      last robot failure posted to dashboard
+  data/threshold_log.json     threshold hits blocked (cooldown, shelf full, …)
+  data/sort_queue.json        sort tasks — status can be failed / skipped_full
+  data/pallet_counts.json     stock pallet box counts
+
+
+--------------------------------------------------------------------------------
+TEST 1 — Sorter failure (box load)
+--------------------------------------------------------------------------------
+Goal: Sort task ends as failed; dashboard shows Last Failure.
+
+Steps:
+  1. Run until a sort task is active (or delete boxes from a stock pallet so
+     task manager queues a sort, then pause sim before sorter picks up).
+  2. Pause simulation.
+  3. Delete the target SPAWNED_BOX_* from the stock pallet (scene tree).
+  4. Resume — sorter times out loading box onto platform.
+
+Expect:
+  Console:  [YOUBOT SORTER] Sort failed seq=N ... box load incomplete
+  Dashboard Last Failure: robot=sorter, reason=box load incomplete
+  data/sort_queue.json:     task status "failed"
+  Task manager:             30 s cooldown before re-ordering same product
+
+
+--------------------------------------------------------------------------------
+TEST 2 — Sorter failure (shelf unpack)
+--------------------------------------------------------------------------------
+Goal: Placement failure when shelf placement does not complete.
+
+Steps:
+  1. Trigger a sort when front shelf has room.
+  2. Pause during SUPERVISOR_PLACE (or move shelf products to block slots).
+  3. Resume and wait for unpack timeout (~60 steps).
+
+Expect:
+  Console:  Sort failed ... shelf unpack incomplete
+  Dashboard Last Failure updated
+  Inventory NOT falsely updated as success
+
+
+--------------------------------------------------------------------------------
+TEST 3 — Restocker failure (timeouts)
+--------------------------------------------------------------------------------
+Goal: Restocker reports failures without crashing.
+
+Steps:
+  1. Move youBot restocker far from conveyor (pause, drag translation).
+  2. Resume with a box on conveyor waiting for pick.
+
+Expect (one or more):
+  Console:  [YOUBOT RESTOCKER WARNING] drive timeout / turn timeout / ...
+  Dashboard Last Failure: robot=restocker
+
+
+--------------------------------------------------------------------------------
+TEST 4 — IPR spawn failure
+--------------------------------------------------------------------------------
+Goal: Pallet reorder fails visibly when spawn cannot complete.
+
+Steps:
+  1. Reduce stock pallet to < 3 boxes (delete boxes in Webots).
+  2. Wait for task manager IPR spawn request.
+  3. Optional: temporarily break spawn (remove DEF IPR_BOX_SPAWN_PAD children).
+
+Expect:
+  Console:  [BOX SPAWNER ERROR] Could not spawn SPAWNED_BOX_N
+  Dashboard Last Failure: robot=ipr
+
+
+--------------------------------------------------------------------------------
+TEST 5 — Threshold event (no task yet)
+--------------------------------------------------------------------------------
+Goal: Dashboard shows threshold_check before a task is created.
+
+Steps:
+  1. Delete 3 front-shelf items for one product (9 → 6).
+  2. Wait for restocking_task_manager tick (~1.5 s).
+
+Expect:
+  Dashboard Last Event: event=threshold_check, kind=shelf_row_missing
+  OR event=task_created when sort is queued
+  data/threshold_log.json: entries if sort was blocked (e.g. shelf full)
+
+
+--------------------------------------------------------------------------------
+TEST 6 — Threshold skip (shelf full)
+--------------------------------------------------------------------------------
+Goal: Threshold/row rule fires but sort is blocked.
+
+Steps:
+  1. Keep front shelf at 9/9.
+  2. Ensure stock pallet has labeled boxes.
+
+Expect:
+  Console:  [STOCK MONITORING] Skip sort — front shelf full (9/9)
+  data/threshold_log.json: reason "no room" or sort_queue skip from stock_monitoring
+  No false inventory restock from scanner (legacy path disabled)
+
+
+--------------------------------------------------------------------------------
+TEST 7 — Nav warning (non-fatal)
+--------------------------------------------------------------------------------
+Goal: Sorter logs warning on nav timeout but may continue.
+
+Steps:
+  1. Obstruct sorter path briefly or let nav timeout fire.
+
+Expect:
+  Console:  Nav waypoint timeout
+  Dashboard Last Event may show robot_warning (not Last Failure unless hard fail)
+
+
+--------------------------------------------------------------------------------
+TEST 8 — Unknown object at conveyor scanner (RubberDuck)
+--------------------------------------------------------------------------------
+Goal: Foreign object triggers Last Event + Last Failure when it reaches the
+      upstream conveyor scanner zone (same zone as SPAWNED_BOX_* scan).
+
+Setup:
+  worlds/exception_handling.wbt includes a RubberDuck on the moving cardbox belt.
+  Scanner zone center: (-0.01, 1.09), radius 0.8 m — belt objects near x≈0,
+  y≈0.56 enter this zone as they travel toward the restocker.
+
+Steps:
+  1. Start dashboard + play exception_handling.wbt.
+  2. Wait for the duck to ride the belt upstream (or pause and place a foreign
+     object inside the scanner zone manually).
+
+Expect:
+  Console:  [SCANNER EXCEPTION] Unknown object passed conveyor scanner: ...
+  Dashboard Last Event + Last Failure: zone=upstream_scanner
+  data/conveyor_unknown.json written; restocker blocks until duck is deleted
+
+
+--------------------------------------------------------------------------------
+TEST 9 — Restocker placement verification (pallet count +1)
+--------------------------------------------------------------------------------
+Goal: After restocker lifts and releases a box, the target stock pallet count
+      must increase by 1; otherwise report restocking failure.
+
+Steps:
+  1. Note stock pallet counts on dashboard (Stock pallet N/5 per product).
+  2. Let a normal restock cycle complete (pick → drive to assigned pallet → release).
+  3. Task manager / IPR assigns each box to BEER_STOCK, CHIPS_STOCK, CHEESE_STOCK,
+     or MILK_STOCK — restocker drives to that pallet's approach point.
+
+Expect (success):
+  Console:  Restock verified on MILK_STOCK: 2 → 3 (+1)
+  Dashboard Last Event: event=restock_complete, target_pallet=..., count_after=...
+
+Expect (failure — delete carried box before drop):
+  0. Remove the RubberDuck first (restocker is blocked while it remains).
+  1. Wait until restocker state is NOT idle (pick / carry / drive to pallet).
+  2. Pause and delete the carried SPAWNED_BOX_* (the one in the gripper).
+  3. Resume within 1-2 seconds.
+
+  Console:  RESTOCK FAILURE: box removed before pallet drop
+            (or box lost during carry / not gripped after close)
+  Dashboard Last Failure: robot=restocker (replaces scanner failure)
+
+
+--------------------------------------------------------------------------------
+QUICK CHECKLIST
+--------------------------------------------------------------------------------
+[ ] Open worlds/exception_handling.wbt (title: "Exception Handling")
+[ ] Dashboard subtitle says exception_handling world
+[ ] Last Failure panel exists and updates on robot errors
+[ ] Sort queue shows "failed" status after Test 1 or 2
+[ ] threshold_log.json grows when sorts are gated
+[ ] No [RESTOCK COMPLETE] fake messages from scanner_controller
+
+See also: threshold_instruction.txt (threshold rules for front shelf + pallets)
+
+================================================================================

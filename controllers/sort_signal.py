@@ -100,7 +100,10 @@ def pending_tasks(project_root, last_seq):
     return [task for task in read_queue(project_root) if int(task.get("seq", 0)) > last_seq]
 
 
-def mark_task_done(project_root, seq, status="done"):
+TERMINAL_TASK_STATUSES = frozenset({"done", "skipped_full", "failed"})
+
+
+def mark_task_done(project_root, seq, status="done", sim_time=None):
     """Mark a queue entry completed so restarts do not replay it."""
     path = queue_path(project_root)
     queue = read_queue(project_root)
@@ -108,6 +111,8 @@ def mark_task_done(project_root, seq, status="done"):
     for task in queue:
         if int(task.get("seq", 0)) == int(seq):
             task["status"] = status
+            if status == "failed" and sim_time is not None:
+                task["t_failed"] = float(sim_time)
             updated = True
     if updated:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -115,12 +120,13 @@ def mark_task_done(project_root, seq, status="done"):
             json.dump(queue, handle, indent=2)
 
 
+def task_is_open(task):
+    return task.get("status", "pending") not in TERMINAL_TASK_STATUSES
+
+
 def last_completed_seq(project_root):
     """Highest seq the sorter has finished (persisted in queue status)."""
-    finished = (
-        "done",
-        "skipped_full",
-    )
+    finished = TERMINAL_TASK_STATUSES
     done = [
         int(task.get("seq", 0))
         for task in read_queue(project_root)

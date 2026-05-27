@@ -16,6 +16,8 @@ import product_routing  # noqa: E402
 import spawned_box  # noqa: E402
 import spawn_signal  # noqa: E402
 import sim_session  # noqa: E402
+import motor_utils  # noqa: E402
+import dashboard_client  # noqa: E402
 
 TIME_STEP = 32
 SPAWN_AREA_RADIUS = ipr_spawn_pad.SPAWN_AREA_RADIUS
@@ -37,19 +39,10 @@ class IprPickDemo:
         self.box_spawn_position, self.box_spawn_rotation, pad_ok = (
             ipr_spawn_pad.resolve_spawn_pad(self.robot.getFromDef)
         )
-        if pad_ok:
-            print(
-                "[BOX SPAWNER] Spawn pad: right_pallet_spawner(1) "
-                f"({self.box_spawn_position[0]:.3f}, "
-                f"{self.box_spawn_position[1]:.3f}, "
-                f"{self.box_spawn_position[2]:.3f})"
-            )
-        else:
-            print(
-                "[BOX SPAWNER WARNING] DEF IPR_BOX_SPAWN_PAD not found — "
-                f"using fallback spawn ({self.box_spawn_position[0]:.3f}, "
-                f"{self.box_spawn_position[1]:.3f}, {self.box_spawn_position[2]:.3f})"
-            )
+        print(
+            f"[BOX SPAWNER] Spawn pad: "
+            f"{ipr_spawn_pad.spawn_pad_label(self.box_spawn_position, pad_ok)}"
+        )
 
         self.box_count = 0
         self.active_box_def = None
@@ -59,6 +52,8 @@ class IprPickDemo:
         self.pending_spawn_pallet = ""
         self.last_spawn_seq = 0
         self.sim_start_time = self.robot.getTime()
+        self.run_id = sim_session.current_run_id(self.project_root)
+        print(f"[BOX SPAWNER] Sim run id={self.run_id}")
         self.waiting_for_spawn = True
         self.box_limit_logged = False
         self.pick_grip_logged = False
@@ -133,15 +128,7 @@ class IprPickDemo:
         self.reset_to_home()
 
     def clamp_motor_position(self, motor, value):
-        if motor is None:
-            return value
-        lo = motor.getMinPosition()
-        hi = motor.getMaxPosition()
-        if math.isfinite(lo) and math.isfinite(hi):
-            if hi <= lo + 1e-9:
-                return lo
-            return max(lo, min(hi, value))
-        return value
+        return motor_utils.clamp_joint_position(motor, value)
 
     def reset_to_home(self):
         """Force valid joint targets after world reload (avoids corrupted hidden state)."""
@@ -229,6 +216,7 @@ class IprPickDemo:
         self.refresh_spawn_pad()
         position = self.box_spawn_position
         rotation = self.box_spawn_rotation
+        _, _, pad_ok = ipr_spawn_pad.resolve_spawn_pad(self.robot.getFromDef)
 
         box_def = f"SPAWNED_BOX_{self.box_count}"
         product_id = self.pending_spawn_product_id or "UNASSIGNED"
@@ -268,13 +256,21 @@ class IprPickDemo:
             print(
                 f"[BOX SPAWNER] Spawned {spawned_def} "
                 f"[{spawned_box.product_label(product_id)} / {box_uid}] "
-                f"on IPR pick pad (right_pallet_spawner(1)) "
-                f"({position[0]:.3f}, {position[1]:.3f}, {position[2]:.3f})"
+                f"on {ipr_spawn_pad.spawn_pad_label(position, pad_ok)}"
             )
             self.pending_spawn_product_id = ""
             self.pending_spawn_pallet = ""
         else:
             print(f"[BOX SPAWNER ERROR] Could not spawn {box_def}")
+            dashboard_client.post_robot_failure(
+                self.project_root,
+                "ipr",
+                f"could not spawn {box_def}",
+                source="ipr",
+                sim_time=self.robot.getTime(),
+                box_def=box_def,
+                product_id=self.pending_spawn_product_id or "",
+            )
             return False
 
         self.box_count += 1
@@ -287,6 +283,9 @@ class IprPickDemo:
 
         seq = int(signal.get("seq", 0))
         if seq <= self.last_spawn_seq:
+            return
+
+        if not sim_session.signal_for_current_run(signal, self.project_root):
             return
 
         detect_time = float(signal.get("t", self.robot.getTime()))
@@ -302,19 +301,30 @@ class IprPickDemo:
         triggered_by = signal.get("triggered_by") or "scanner"
         self.pending_spawn_product_id = product_id
         self.pending_spawn_pallet = signal.get("target_pallet") or ""
-        self.spawn_after_time = now + box_logic.SPAWN_DELAY_SEC
+        if triggered_by == "task_manager":
+            delay = box_logic.SPAWN_TASK_MANAGER_DELAY_SEC
+        else:
+            delay = box_logic.SPAWN_DELAY_SEC
+        if delay <= 0.0:
+            self.spawn_after_time = None
+        else:
+            self.spawn_after_time = now + delay
         self.pending_spawn = True
         if triggered_by == "task_manager" and product_id:
-            print(
-                f"[BOX SPAWNER] Task manager ordered {product_id}; "
-                f"next spawn in {box_logic.SPAWN_DELAY_SEC:.0f}s "
-                f"(at t={self.spawn_after_time:.1f})"
-            )
+            if delay <= 0.0:
+                print(
+                    f"[BOX SPAWNER] Task manager ordered {product_id}; "
+                    "spawning immediately on IPR pad"
+                )
+            else:
+                print(
+                    f"[BOX SPAWNER] Task manager ordered {product_id}; "
+                    f"next spawn in {delay:.0f}s (at t={self.spawn_after_time:.1f})"
+                )
         else:
             print(
                 f"[BOX SPAWNER] Conveyor scanner saw {trigger_box}; "
-                f"next spawn in {box_logic.SPAWN_DELAY_SEC:.0f}s "
-                f"(at t={self.spawn_after_time:.1f})"
+                f"next spawn in {delay:.0f}s (at t={self.spawn_after_time:.1f})"
             )
 
     def try_scheduled_spawn(self):
@@ -429,6 +439,14 @@ class IprPickDemo:
                     and not self.gripper_closed()
                 ):
                     print("[IPR WARNING] Pick timeout — gripper may not be fully closed")
+                    dashboard_client.post_robot_failure(
+                        self.project_root,
+                        "ipr",
+                        "pick timeout — gripper may not be fully closed",
+                        source="ipr",
+                        sim_time=self.robot.getTime(),
+                        box_def=self.active_box_def or "",
+                    )
                 self.pose_step = 0
                 self.pose_index += 1
 

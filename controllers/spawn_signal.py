@@ -4,6 +4,7 @@ import json
 import os
 
 import product_routing
+import sim_session
 
 SIGNAL_FILENAME = "spawn_signal.json"
 
@@ -21,6 +22,19 @@ def read_signal(project_root):
         return None
 
 
+def current_seq(project_root):
+    signal = read_signal(project_root)
+    return int((signal or {}).get("seq", 0))
+
+
+def clear_signal(project_root):
+    path = signal_path(project_root)
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def write_signal(
     project_root,
     box_def,
@@ -35,8 +49,10 @@ def write_signal(
     os.makedirs(os.path.dirname(path), exist_ok=True)
     current = read_signal(project_root) or {}
     sequence = int(current.get("seq", 0)) + 1
+    run_id = sim_session.current_run_id(project_root)
     payload = {
         "seq": sequence,
+        "run_id": run_id,
         "box_def": box_def,
         "product_id": product_id,
         "target_pallet": target_pallet,

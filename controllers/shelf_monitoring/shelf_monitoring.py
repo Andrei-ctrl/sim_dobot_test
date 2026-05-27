@@ -94,16 +94,21 @@ class ShelfMonitoring:
     def walk_field(self, field, entries, next_index):
         if field is None:
             return next_index
-        try:
-            count = field.getCount()
-        except (AttributeError, RuntimeError):
-            return next_index
-        for i in range(count):
+        index = 0
+        while True:
             try:
-                node = field.getMFNode(i)
+                count = field.getCount()
             except (AttributeError, RuntimeError):
+                break
+            if index >= count:
+                break
+            try:
+                node = field.getMFNode(index)
+            except (AttributeError, RuntimeError):
+                index += 1
                 continue
             if node is None:
+                index += 1
                 continue
             type_name = node.getTypeName()
             if type_name in logic.PRODUCT_TYPE_NAMES:
@@ -115,7 +120,9 @@ class ShelfMonitoring:
                 children = node.getField("children")
             except (AttributeError, RuntimeError):
                 children = None
-            next_index = self.walk_field(children, entries, next_index)
+            if children is not None:
+                next_index = self.walk_field(children, entries, next_index)
+            index += 1
         return next_index
 
     def collect_shelf_nodes(self):
