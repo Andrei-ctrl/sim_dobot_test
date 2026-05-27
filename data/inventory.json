@@ -5,7 +5,38 @@
     "storage_stock": 3,
     "front_stock": 2,
     "threshold": 2,
-    "storage_shelf": "STORAGE_DRINKS",
-    "front_shelf": "FRONT_DRINKS"
+    "storage_shelf": "Beer section",
+    "front_shelf": "FRONT_DRINKS",
+    "shelf_operations": 0
+  },
+  "CHIPS": {
+    "name": "CHIPS",
+    "category": "Snacks",
+    "storage_stock": 3,
+    "front_stock": 2,
+    "threshold": 2,
+    "storage_shelf": "Chips section",
+    "front_shelf": "FRONT_DRINKS",
+    "shelf_operations": 0
+  },
+  "CHEESE": {
+    "name": "CHEESE",
+    "category": "Dairy",
+    "storage_stock": 3,
+    "front_stock": 2,
+    "threshold": 2,
+    "storage_shelf": "Cheese section",
+    "front_shelf": "FRONT_DRINKS",
+    "shelf_operations": 0
+  },
+  "MILK": {
+    "name": "MILK",
+    "category": "Dairy",
+    "storage_stock": 3,
+    "front_stock": 2,
+    "threshold": 2,
+    "storage_shelf": "Milk section",
+    "front_shelf": "FRONT_DRINKS",
+    "shelf_operations": 0
   }
 }
