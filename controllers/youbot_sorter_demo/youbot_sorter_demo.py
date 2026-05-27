@@ -19,10 +19,12 @@ import shelf_monitoring_logic as shelf_mon
 import sort_signal
 import motor_utils
 import dashboard_client
+import sim_session
 import youbot_mecanum as mecanum
 import youbot_sorter_logic as logic
 
 ACTION_SPEED = 1.0
+TELEPORT_NAV = True
 
 DRIVE_TOLERANCE = logic.NAV_POS_TOL
 DRIVE_SPEED = 0.55 * ACTION_SPEED
@@ -44,7 +46,7 @@ class YoubotSorterDemo:
         self.root = self.robot.getRoot()
         self.children = self.root.getField("children")
         self.project_root = os.path.abspath(os.path.join(_CONTROLLERS_DIR, ".."))
-        sort_signal.reset_signal(self.project_root, clear_queue=True)
+        self.run_id = sim_session.current_run_id(self.project_root)
 
         self.wheels = [self.robot.getDevice(f"wheel{i}") for i in range(1, 5)]
         missing = [i + 1 for i, wheel in enumerate(self.wheels) if wheel is None]
@@ -75,7 +77,7 @@ class YoubotSorterDemo:
         self.state = "WAIT_SIGNAL"
         self.timer = 0
         self.last_sort_seq = logic.initial_sort_seq_baseline(
-            sort_signal.last_completed_seq(self.project_root)
+            sort_signal.last_completed_seq(self.project_root, run_id=self.run_id)
         )
         self.signal_wait_logged = False
         self.queue_wait_log_step = 0
@@ -85,25 +87,32 @@ class YoubotSorterDemo:
         self.sort_succeeded = False
         self.loaded_cube_defs = []
         self.carried_box_def = ""
+        self.unpack_attempted = False
+        self.last_unpack_count = 0
         self.nav_steps = []
         self.nav_step_index = 0
         self.nav_target = [0.0, 0.0, 0.0]
         self.last_nav_log = ""
 
         print("[YOUBOT SORTER] Product waypoint navigation v5 (cardinal mecanum, fixed path)")
+        if TELEPORT_NAV:
+            print("[YOUBOT SORTER] Navigation: supervisor teleport to waypoints (fast path)")
+        else:
+            print("[YOUBOT SORTER] Navigation: mecanum wheel drive")
         print(
             f"[YOUBOT SORTER] Home ({self.home_translation[0]:.3f}, "
             f"{self.home_translation[1]:.3f}), "
             f"products: {', '.join(logic.PRODUCT_SORT_ROUTES)}"
         )
         print(f"[YOUBOT SORTER] IPC queue: {sort_signal.queue_path(self.project_root)}")
+        print(f"[YOUBOT SORTER] Sim run id={self.run_id}")
         print(
             f"[YOUBOT SORTER] Sort baseline last_seq={self.last_sort_seq} "
             f"(pending IPC tasks will be accepted)"
         )
         print(
-            "[YOUBOT SORTER] IPC only: task_manager + stock_monitoring "
-            "(pallet auto-scan disabled)"
+            "[YOUBOT SORTER] IPC only: task_manager creates sort tasks "
+            "(stock_monitoring reports pallet counts only)"
         )
         if self.robot.step(self.time_step) != -1:
             motor_utils.snap_motors(
@@ -112,22 +121,33 @@ class YoubotSorterDemo:
             )
             motor_utils.snap_motors((grip, 0.0) for grip in self.gripper_motors)
 
-    def task_trigger_source(self, parsed):
-        triggered_by = (parsed.get("triggered_by") or "").strip()
-        if triggered_by:
-            return triggered_by
-        task_type = parsed.get("task_type", "stock_pallet")
-        if task_type == "front_restock":
-            return "task_manager"
-        if parsed.get("box_def"):
-            return "stock_monitoring"
-        return "sort_queue"
+    def active_run_id(self):
+        return sim_session.current_run_id(self.project_root)
+
+    def ensure_run_session(self):
+        run_id = self.active_run_id()
+        if run_id == self.run_id:
+            return
+        self.run_id = run_id
+        self.last_sort_seq = logic.initial_sort_seq_baseline(
+            sort_signal.last_completed_seq(self.project_root, run_id=self.run_id)
+        )
+        self.signal_wait_logged = False
+        print(
+            f"[YOUBOT SORTER] Session run id={self.run_id} "
+            f"(sort baseline last_seq={self.last_sort_seq})"
+        )
+
+    def task_from_task_manager(self, parsed):
+        return (parsed.get("triggered_by") or "").strip() == "task_manager"
 
     def log_queue_status(self, force=False):
         if not force and self.timer - self.queue_wait_log_step < self.act_steps(120):
             return
         self.queue_wait_log_step = self.timer
-        pending = sort_signal.pending_tasks(self.project_root, self.last_sort_seq)
+        pending = sort_signal.pending_tasks(
+            self.project_root, self.last_sort_seq, run_id=self.run_id
+        )
         summaries = []
         for task in pending[:4]:
             summaries.append(
@@ -221,6 +241,31 @@ class YoubotSorterDemo:
             pos[2] = z
             self.self_node.getField("translation").setSFVec3f(pos)
 
+    def snap_to_pose(self, xyz):
+        """Supervisor snap to calibrated waypoint (translation + home rotation)."""
+        self.stop_wheels()
+        self.self_node.getField("translation").setSFVec3f(
+            [float(xyz[0]), float(xyz[1]), float(xyz[2])]
+        )
+        self.self_node.getField("rotation").setSFRotation(self.home_rotation)
+        self.self_node.resetPhysics()
+        self.maintain_carried_box()
+
+    def run_nav_teleport(self):
+        """Instantly visit axis waypoints; stop at pickup/deposit/idle actions."""
+        while self.nav_step_index < len(self.nav_steps):
+            step = self.nav_steps[self.nav_step_index]
+            self.snap_to_pose(step["xyz"])
+            self.log_nav(step.get("log", ""))
+            action = step.get("action", "continue")
+            if action in ("pre_pickup", "continue"):
+                if not self.advance_nav_step():
+                    self.change_state("WAIT_SIGNAL")
+                continue
+            self.on_nav_waypoint_reached()
+            return
+        self.change_state("WAIT_SIGNAL")
+
     def begin_nav_steps(self, steps):
         self.nav_steps = list(steps)
         self.nav_step_index = 0
@@ -288,12 +333,16 @@ class YoubotSorterDemo:
                 self.change_state("WAIT_SIGNAL")
 
     def peek_next_sort_task(self):
-        pending = sort_signal.pending_tasks(self.project_root, self.last_sort_seq)
+        pending = sort_signal.pending_tasks(
+            self.project_root, self.last_sort_seq, run_id=self.run_id
+        )
         parsed = logic.next_pending_task(pending, self.last_sort_seq)
         if parsed is not None:
             return parsed
         signal = sort_signal.read_signal(self.project_root)
-        should_run, parsed = logic.should_process_signal(signal, self.last_sort_seq)
+        should_run, parsed = logic.should_process_signal(
+            signal, self.last_sort_seq, run_id=self.run_id
+        )
         if should_run:
             return parsed
         return None
@@ -307,9 +356,9 @@ class YoubotSorterDemo:
     def can_execute_sort_task(self, parsed):
         product_id = parsed["product_id"]
         cube_count = int(parsed.get("cube_count", logic.BOTTLES_PER_BOX))
-        if not shelf_mon.shelf_monitoring_ready(self.project_root):
+        if not shelf_mon.shelf_monitoring_ready(self.project_root, run_id=self.run_id):
             return False, "waiting for shelf counts"
-        counts = shelf_mon.read_counts(self.project_root)
+        counts = shelf_mon.read_counts(self.project_root, run_id=self.run_id)
         current = int(counts.get(product_id, 0))
         maximum = shelf_mon.max_slots_for_product(product_id)
         if not shelf_mon.can_accept_sort(current, product_id, cube_count):
@@ -330,6 +379,12 @@ class YoubotSorterDemo:
             parsed = self.peek_next_sort_task()
             if parsed is None:
                 return None
+            if not self.task_from_task_manager(parsed):
+                self.skip_sort_task(
+                    parsed,
+                    f"not from task_manager (by={parsed.get('triggered_by') or '?'})",
+                )
+                continue
             ok, reason = self.can_execute_sort_task(parsed)
             if ok:
                 return parsed
@@ -375,15 +430,35 @@ class YoubotSorterDemo:
             source="sorter",
         )
 
+    def skip_pending_sorts_if_shelf_full(self, product_id):
+        if not shelf_mon.shelf_monitoring_ready(self.project_root, run_id=self.run_id):
+            return
+        counts = shelf_mon.read_counts(self.project_root, run_id=self.run_id)
+        current = int(counts.get(product_id, 0))
+        if shelf_mon.can_accept_sort(current, product_id):
+            return
+        skipped = sort_signal.skip_open_tasks_for_product(
+            self.project_root, product_id, run_id=self.run_id
+        )
+        if skipped:
+            self.last_sort_seq = max(self.last_sort_seq, max(skipped))
+            print(
+                f"[YOUBOT SORTER] Cleared {len(skipped)} pending sort task(s) for "
+                f"{product_id} — shelf full ({current}/"
+                f"{shelf_mon.max_slots_for_product(product_id)})"
+            )
+
     def accept_sort_task(self, parsed, *, source_hint=""):
         self.signal_wait_logged = False
+        self.unpack_attempted = False
+        self.last_unpack_count = 0
         self.last_sort_seq = parsed["seq"]
         self.active_task = parsed
         self.sort_succeeded = False
         self.loaded_cube_defs = list(parsed.get("cube_defs") or [])
         task_type = parsed.get("task_type", "stock_pallet")
         reason = parsed.get("reason", "")
-        source = source_hint or self.task_trigger_source(parsed)
+        source = source_hint or (parsed.get("triggered_by") or "task_manager")
         print(
             f"[YOUBOT SORTER] RECEIVED sort trigger source={source} seq={parsed['seq']} "
             f"type={task_type} product={parsed['product_id']} "
@@ -443,13 +518,13 @@ class YoubotSorterDemo:
         return logic.shelf_base_for_product(product_id)
 
     def process_sort_signal(self):
+        self.ensure_run_session()
         parsed = self.next_executable_sort_task()
         if parsed is None:
             if not self.signal_wait_logged:
                 self.signal_wait_logged = True
                 print(
-                    "[YOUBOT SORTER] Waiting for sort task via IPC "
-                    "(task_manager / stock_monitoring)"
+                    "[YOUBOT SORTER] Waiting for sort task via IPC (task_manager)"
                 )
             self.log_queue_status()
             return False
@@ -457,50 +532,6 @@ class YoubotSorterDemo:
         self.accept_sort_task(parsed)
         self.start_pickup_for_active_task()
         return True
-
-    def scan_pallet_for_box_task(self):
-        if sort_signal.pending_tasks(self.project_root, self.last_sort_seq):
-            self.log_queue_status(force=True)
-            print(
-                "[YOUBOT SORTER] Pallet scan skipped — "
-                "pending IPC sort task(s) in queue"
-            )
-            return False
-        if self.peek_next_sort_task() is not None:
-            return False
-        for index in range(100):
-            box_def = f"{product_routing.BOX_DEF_PREFIX}{index}"
-            node = self.robot.getFromDef(box_def)
-            if node is None:
-                continue
-            pos = list(node.getField("translation").getSFVec3f())
-            pallet_def = None
-            for candidate in product_routing.iter_pallet_defs():
-                if product_routing.box_on_pallet(pos, candidate):
-                    pallet_def = candidate
-                    break
-            if pallet_def is None:
-                continue
-            route = product_routing.route_for_pallet_def(pallet_def)
-            parsed = {
-                "seq": self.last_sort_seq + 1,
-                "product_id": route["product_id"],
-                "source_pallet": pallet_def,
-                "box_def": box_def,
-                "cube_count": logic.BOTTLES_PER_BOX,
-                "units_per_cube": logic.UNITS_PER_CUBE,
-                "cube_defs": [],
-                "t": self.robot.getTime(),
-            }
-            print(
-                f"[YOUBOT SORTER] Pallet fallback (no IPC task): {box_def} on {pallet_def} "
-                f"({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})"
-            )
-            self.last_sort_seq = max(self.last_sort_seq, int(parsed["seq"]))
-            self.accept_sort_task(parsed, source_hint="pallet_fallback")
-            self.start_pickup_for_active_task()
-            return True
-        return False
 
     def supervisor_load_box_on_platform(self):
         if not self.active_task:
@@ -545,24 +576,98 @@ class YoubotSorterDemo:
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             return {}
 
+    def node_world_position(self, node):
+        if node.getTypeName() not in shelf_mon.PRODUCT_TYPE_NAMES:
+            return None
+        try:
+            pos = node.getPosition()
+            if pos and len(pos) >= 3:
+                return [float(pos[0]), float(pos[1]), float(pos[2])]
+        except (AttributeError, TypeError, RuntimeError):
+            pass
+        try:
+            pose = node.getPose()
+            if pose and len(pose) >= 3:
+                return [float(pose[0]), float(pose[1]), float(pose[2])]
+        except (AttributeError, TypeError, RuntimeError):
+            pass
+        field = node.getField("translation")
+        if field is not None:
+            return list(field.getSFVec3f())
+        return None
+
+    def walk_shelf_field(self, field, entries, next_index):
+        if field is None:
+            return next_index
+        index = 0
+        while True:
+            try:
+                count = field.getCount()
+            except (AttributeError, RuntimeError):
+                break
+            if index >= count:
+                break
+            try:
+                node = field.getMFNode(index)
+            except (AttributeError, RuntimeError):
+                index += 1
+                continue
+            if node is None:
+                index += 1
+                continue
+            type_name = node.getTypeName()
+            if type_name in shelf_mon.PRODUCT_TYPE_NAMES:
+                pos = self.node_world_position(node)
+                if pos is not None and shelf_mon.in_shelf_bank(pos):
+                    entries.append((next_index, type_name, pos))
+                    next_index += 1
+            try:
+                children = node.getField("children")
+            except (AttributeError, RuntimeError):
+                children = None
+            if children is not None:
+                next_index = self.walk_shelf_field(children, entries, next_index)
+            index += 1
+        return next_index
+
+    def collect_shelf_node_entries(self):
+        entries = []
+        self.walk_shelf_field(self.root.getField("children"), entries, 0)
+        return entries
+
     def supervisor_unpack_box_to_shelf(self):
         if not self.active_task:
             return False
+        if self.unpack_attempted:
+            return self.last_unpack_count >= int(
+                self.active_task.get("cube_count", logic.BOTTLES_PER_BOX)
+            )
 
         product_id = self.active_task["product_id"]
+        count = int(self.active_task.get("cube_count", logic.BOTTLES_PER_BOX))
         shelf_base = self.get_shelf_base(product_id)
         route = product_routing.route_for_product_id(product_id)
         box_def = self.carried_box_def or self.active_task.get("box_def", "")
-        count = self.active_task.get("cube_count", logic.BOTTLES_PER_BOX)
 
-        inventory = self.load_inventory()
-        operation_index = logic.shelf_operation_index(inventory, product_id)
-        if not logic.shelf_has_capacity(inventory, product_id):
+        shelf_entries = self.collect_shelf_node_entries()
+        operation_index, target_slots = shelf_mon.find_placement_slots(
+            shelf_entries, product_id, count=count
+        )
+        if not target_slots:
             print(
-                f"[YOUBOT SORTER WARNING] Shelf full for {product_id} "
-                f"({logic.SHELF_MAX_SORT_OPERATIONS} operations max)"
+                f"[YOUBOT SORTER] No empty shelf row for {product_id} — "
+                "skipping placement"
             )
+            self.unpack_attempted = True
+            self.last_unpack_count = 0
+            return False
 
+        print(
+            f"[YOUBOT SORTER] Target shelf row: {logic.shelf_row_label(operation_index)} "
+            f"({len(target_slots)} empty slot(s))"
+        )
+
+        self.unpack_attempted = True
         spawned = product_cubes.unpack_box_to_shelf(
             self.children,
             self.robot.getFromDef,
@@ -571,21 +676,24 @@ class YoubotSorterDemo:
             product_id=product_id,
             count=count,
             operation_index=operation_index,
+            slot_positions=target_slots,
         )
+        self.last_unpack_count = len(spawned)
         self.loaded_cube_defs = spawned
         self.carried_box_def = ""
-        slots = logic.shelf_slots_for_operation(product_id, operation_index)
+        self.active_task["shelf_operation_index"] = operation_index
         print(
             f"[YOUBOT SORTER] Unpacked box to {route['shelf_name']} "
-            f"(operation {operation_index + 1}/{logic.SHELF_MAX_SORT_OPERATIONS}): "
+            f"({logic.shelf_row_label(operation_index)} row, "
+            f"operation {operation_index + 1}/{logic.SHELF_MAX_SORT_OPERATIONS}): "
             f"{len(spawned)}/{count} bottles"
         )
-        for index, slot in enumerate(slots[: len(spawned)]):
+        for index, slot in enumerate(target_slots[: len(spawned)]):
             print(
                 f"[YOUBOT SORTER]   bottle {index + 1} -> "
                 f"({slot[0]:.4f}, {slot[1]:.4f}, {slot[2]:.4f})"
             )
-        return len(spawned) >= count
+        return self.last_unpack_count >= count
 
     def update_inventory(self):
         if not self.active_task:
@@ -616,7 +724,10 @@ class YoubotSorterDemo:
             }
 
         inventory[product_id]["storage_stock"] += delta
-        ops = logic.increment_shelf_operation(inventory, product_id)
+        operation_index = self.active_task.get("shelf_operation_index")
+        ops = logic.increment_shelf_operation(
+            inventory, product_id, operation_index=operation_index
+        )
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(inventory, handle, indent=2)
 
@@ -682,20 +793,23 @@ class YoubotSorterDemo:
             self.process_sort_signal()
 
         elif self.state == "NAV_WAYPOINT":
-            self.maintain_carried_box()
-            target = self.nav_target
-            if self.drive_toward_xyz_mecanum(
-                target[0],
-                target[1],
-                target[2],
-                tolerance=DRIVE_TOLERANCE,
-            ):
-                self.on_nav_waypoint_reached()
-            elif self.timer >= MAX_DRIVE_TIME:
-                self.stop_wheels()
-                print("[YOUBOT SORTER WARNING] Nav waypoint timeout, continuing")
-                self.report_sorter_warning("nav waypoint timeout")
-                self.on_nav_waypoint_reached()
+            if TELEPORT_NAV:
+                self.run_nav_teleport()
+            else:
+                self.maintain_carried_box()
+                target = self.nav_target
+                if self.drive_toward_xyz_mecanum(
+                    target[0],
+                    target[1],
+                    target[2],
+                    tolerance=DRIVE_TOLERANCE,
+                ):
+                    self.on_nav_waypoint_reached()
+                elif self.timer >= MAX_DRIVE_TIME:
+                    self.stop_wheels()
+                    print("[YOUBOT SORTER WARNING] Nav waypoint timeout, continuing")
+                    self.report_sorter_warning("nav waypoint timeout")
+                    self.on_nav_waypoint_reached()
 
         elif self.state == "LOAD_BOX_ON_PLATFORM":
             if self.supervisor_load_box_on_platform():
@@ -706,9 +820,13 @@ class YoubotSorterDemo:
                 self.fail_sort_task("box load incomplete — box missing or not on platform")
 
         elif self.state == "SUPERVISOR_PLACE":
-            if self.supervisor_unpack_box_to_shelf():
+            if self.unpack_attempted and self.last_unpack_count <= 0:
+                self.fail_sort_task("shelf full — no empty row for placement")
+            elif self.supervisor_unpack_box_to_shelf():
                 self.sort_succeeded = True
                 self.change_state("UPDATE_INVENTORY")
+            elif self.unpack_attempted:
+                self.fail_sort_task("shelf unpack incomplete")
             elif self.timer >= self.act_steps(60):
                 print("[YOUBOT SORTER WARNING] Shelf unpack incomplete")
                 self.fail_sort_task("shelf unpack incomplete")
@@ -725,6 +843,7 @@ class YoubotSorterDemo:
                     self.active_task["product_id"] if self.active_task else ""
                 )
                 self.last_sorted_product_id = self.completed_product_id
+                self.skip_pending_sorts_if_shelf_full(self.completed_product_id)
             else:
                 if self.active_task:
                     self.fail_sort_task("sort did not complete placement")

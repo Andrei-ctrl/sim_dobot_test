@@ -1,4 +1,4 @@
-"""Supervisor: scan front shelves and publish per-product item counts."""
+"""Supervisor: scan front shelves and publish counts for task_manager (no tasks)."""
 
 import json
 import os
@@ -17,6 +17,7 @@ for path in (_DEMO_DIR, _CONTROLLERS_DIR, _SORTER_DIR):
 
 import project_paths  # noqa: E402
 import shelf_monitoring_logic as logic  # noqa: E402
+import sim_session  # noqa: E402
 
 TIME_STEP = 32
 PUBLISH_EVERY_STEPS = 16
@@ -39,7 +40,9 @@ class ShelfMonitoring:
         self.project_root = project_paths.project_root_from_controller_file(__file__)
         self.step = 0
         self.baseline_counts = {}
+        self.peak_counts = {}
         self.baseline_locked = False
+        self.baseline_run_id = None
         self.last_counts = {}
         self.last_log_step = 0
         self.scan_debug_logged = False
@@ -61,6 +64,7 @@ class ShelfMonitoring:
             f"[SHELF MONITORING] Sensors={list(self.sensors.keys()) or 'scene-scan only'}"
         )
         print(f"[SHELF MONITORING] Output: {logic.shelf_counts_path(self.project_root)}")
+        print("[SHELF MONITORING] Observations only — task_manager creates sort tasks")
         beer_slots = logic.slots_for_product("BEER_BOTTLE")
         if beer_slots:
             print(f"[SHELF MONITORING] Slot grid loaded ({len(beer_slots)} beer slots)")
@@ -69,6 +73,9 @@ class ShelfMonitoring:
                 "[SHELF MONITORING WARNING] youbot_sorter_logic not loaded — "
                 "shelf counts will be wrong"
             )
+
+    def active_run_id(self):
+        return sim_session.current_run_id(self.project_root)
 
     def node_world_position(self, node):
         """World XYZ for product proto nodes (Pose-derived in Webots)."""
@@ -179,21 +186,34 @@ class ShelfMonitoring:
         )
         print(f"[SHELF MONITORING] t={sim_time:.1f}s counts: {', '.join(parts)}{base}")
 
+    def update_peak_counts(self, counts):
+        self.peak_counts = logic.merge_peak_counts(self.peak_counts, counts)
+
     def try_lock_baseline(self, counts):
-        if sum(counts.values()) <= 0:
+        self.update_peak_counts(counts)
+        peak = dict(self.peak_counts)
+        if sum(peak.values()) <= 0:
             if self.step >= BASELINE_MAX_WAIT_STEPS:
                 print(
                     "[SHELF MONITORING WARNING] Baseline still zero after wait — "
                     "check shelf item positions / world reload"
                 )
             return False
-        self.baseline_counts = dict(counts)
+        self.baseline_counts = peak
         self.baseline_locked = True
-        print("[SHELF MONITORING] Baseline shelf counts:")
+        self.baseline_run_id = self.active_run_id()
+        print(
+            f"[SHELF MONITORING] Baseline shelf counts "
+            f"(peak during settle, run id={self.baseline_run_id}):"
+        )
         for product_id in logic.product_ids():
-            item_count = counts.get(product_id, 0)
+            item_count = peak.get(product_id, 0)
             rows = item_count // 3
-            print(f"  {product_id}: {item_count} items ({rows} rows)")
+            current = counts.get(product_id, 0)
+            note = ""
+            if current != item_count:
+                note = f" (current={current})"
+            print(f"  {product_id}: {item_count} items ({rows} rows){note}")
         return True
 
     def tick(self):
@@ -202,8 +222,10 @@ class ShelfMonitoring:
         counts = logic.count_all_products(entries)
         self.last_counts = counts
 
-        if not self.baseline_locked and self.step >= BASELINE_SETTLE_STEPS:
-            self.try_lock_baseline(counts)
+        if not self.baseline_locked:
+            self.update_peak_counts(counts)
+            if self.step >= BASELINE_SETTLE_STEPS:
+                self.try_lock_baseline(counts)
 
         if self.step % PUBLISH_EVERY_STEPS != 0:
             return
@@ -219,6 +241,7 @@ class ShelfMonitoring:
             counts,
             baseline=self.baseline_counts if self.baseline_locked else None,
             baseline_locked=self.baseline_locked,
+            run_id=self.baseline_run_id if self.baseline_locked else self.active_run_id(),
         )
         payload["capacity"] = logic.shelf_capacity_summary(counts)
         logic.save_shelf_counts(self.project_root, payload)

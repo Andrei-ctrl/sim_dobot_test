@@ -24,11 +24,17 @@ youBot restocker (youbot_restocker_demo)
   └─ drives to BEER_STOCK → places box → returns home (wheel drive + snap)
 
 stock_monitoring (stock_monitoring supervisor)
-  └─ detects box on stock pallet → writes data/sort_signal.json
+  └─ counts boxes on stock pallets → data/pallet_counts.json (no sort tasks)
+
+shelf_monitoring (shelf_monitoring supervisor)
+  └─ counts front-shelf items → data/shelf_counts.json (baseline + current)
+
+restocking_task_manager_demo
+  └─ reads shelf + pallet observations → sort_queue.json / spawn_signal.json
 
 youBot sorter (youbot_sorter_demo)
-  └─ drives to BEER_STOCK → unpacks box → 3 BeerBottle on platform
-  └─ drives to Beer section shelf → places bottles → updates inventory
+  └─ executes sort tasks from task_manager only (sort_queue.json)
+  └─ drives to stock pallet → unpacks box → places on front shelf row
 ```
 
 ## Quick start
@@ -101,7 +107,7 @@ Full restocker implementation with mecanum navigation and sensor-guided pickup.
 - **Files:** `youbot_restocker_demo.py`, `youbot_restocker_logic.py`, `YoubotRestockerDemo.txt`
 - **Robot:** `DEF STORE_YOUBOT_RESTOCKER` (YoubotBoxGrip)
 - **Stock pallets:** `DEF BEER_STOCK`, `CHIPS_STOCK`, `CHEESE_STOCK`, `MILK_STOCK`
-- **Monitoring:** `stock_monitoring` supervisor → `sort_signal.json`
+- **Monitoring:** `stock_monitoring` → pallet counts; `shelf_monitoring` → shelf counts; `restocking_task_manager_demo` → tasks
 
 Key behavior:
 

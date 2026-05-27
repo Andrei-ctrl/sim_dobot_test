@@ -116,10 +116,13 @@ BOX_ON_PALLET_ROTATION = [4.66295e-18, -8.32667e-18, 1, 3.13905]
 SHELF_ROUTE_CORNER_1 = [-8.77, 8.91]
 SHELF_ROUTE_CORNER_2 = [-12.36, 8.91]
 
-# Calibrated beer shelf grid: 3 sort operations x 3 bottles (9 slots total).
-# Shelf node at (-11.5, 2.7, 0). Rows are top -> bottom (ops 1 -> 3).
+# Calibrated beer shelf grid: 3 rows x 3 columns (9 hardcoded world XYZ slots).
+# Shelf node at (-11.5, 2.7, 0). Rows are top -> middle -> bottom (high Z -> low Z).
 BEER_SHELF_CENTER_Y = 2.7
 SHELF_MAX_SORT_OPERATIONS = 3
+SHELF_ROW_LABELS = ("top", "middle", "bottom")
+SLOT_XY_RADIUS = 0.14
+SLOT_Z_RADIUS = 0.22
 
 BEER_SHELF_ALL_SLOTS = [
     # Operation 1 — top row
@@ -524,8 +527,72 @@ def obstacle_blocks_forward(sensor_value, min_distance_m=None):
     return clearance <= min_distance_m
 
 
+def shelf_row_label(row_index):
+    if 0 <= int(row_index) < len(SHELF_ROW_LABELS):
+        return SHELF_ROW_LABELS[int(row_index)]
+    return f"row_{int(row_index) + 1}"
+
+
+def slot_match(pos, slot, *, xy_radius=SLOT_XY_RADIUS, z_radius=SLOT_Z_RADIUS):
+    return (
+        math.hypot(pos[0] - slot[0], pos[1] - slot[1]) <= xy_radius
+        and abs(pos[2] - slot[2]) <= z_radius
+    )
+
+
+def all_slots_for_product(product_id):
+    return PRODUCT_SHELF_ALL_SLOTS.get(
+        product_id, PRODUCT_SHELF_ALL_SLOTS[DEFAULT_PRODUCT_ID]
+    )
+
+
+def row_slot_indices(row_index):
+    start = int(row_index) * BOTTLES_PER_BOX
+    return list(range(start, start + BOTTLES_PER_BOX))
+
+
+def occupied_slot_indices(positions, product_id):
+    """positions: list of [x,y,z] for items already on this product shelf."""
+    slots = all_slots_for_product(product_id)
+    occupied = set()
+    used = set()
+    for slot_index, slot in enumerate(slots):
+        for pos_index, pos in enumerate(positions):
+            if pos_index in used:
+                continue
+            if slot_match(pos, slot):
+                occupied.add(slot_index)
+                used.add(pos_index)
+                break
+    return occupied
+
+
+def find_empty_row_placement(positions, product_id, count=None):
+    """
+    Pick the first wholly empty row (top -> middle -> bottom), else empty slots.
+    Returns (row_index, [slot_xyz, ...]) or (None, []).
+    """
+    count = BOTTLES_PER_BOX if count is None else int(count)
+    slots = all_slots_for_product(product_id)
+    if not slots:
+        return None, []
+
+    occupied = occupied_slot_indices(positions, product_id)
+    for row in range(SHELF_MAX_SORT_OPERATIONS):
+        row_indices = row_slot_indices(row)
+        if all(index not in occupied for index in row_indices):
+            return row, [list(slots[index]) for index in row_indices[:count]]
+
+    empty_indices = [index for index in range(len(slots)) if index not in occupied]
+    if len(empty_indices) >= count:
+        chosen = empty_indices[:count]
+        row = chosen[0] // BOTTLES_PER_BOX
+        return row, [list(slots[index]) for index in chosen]
+    return None, []
+
+
 def shelf_operation_index(inventory, product_id):
-    """Next sort operation row (0..SHELF_MAX_SORT_OPERATIONS-1)."""
+    """Legacy fallback row index from inventory counter."""
     item = inventory.get(product_id) or {}
     used = int(item.get("shelf_operations", 0))
     return min(used, SHELF_MAX_SORT_OPERATIONS - 1)
@@ -549,11 +616,15 @@ def shelf_slots_for_operation(product_id, operation_index):
     return [list(pos) for pos in slots[start:end]]
 
 
-def increment_shelf_operation(inventory, product_id):
+def increment_shelf_operation(inventory, product_id, operation_index=None):
     if product_id not in inventory:
         return 0
     used = int(inventory[product_id].get("shelf_operations", 0))
-    used = min(used + 1, SHELF_MAX_SORT_OPERATIONS)
+    if operation_index is not None:
+        used = max(used, int(operation_index) + 1)
+    else:
+        used = min(used + 1, SHELF_MAX_SORT_OPERATIONS)
+    used = min(used, SHELF_MAX_SORT_OPERATIONS)
     inventory[product_id]["shelf_operations"] = used
     return used
 
@@ -606,10 +677,14 @@ def initial_sort_seq_baseline(completed_seq=0):
     return int(completed_seq)
 
 
-def should_process_signal(signal, last_seq, sim_start_time=None, current_time=None):
+def should_process_signal(signal, last_seq, sim_start_time=None, current_time=None, run_id=None):
     parsed = parse_sort_signal(signal)
     if parsed is None:
         return False, None
+    if run_id is not None:
+        signal_run = int((signal or {}).get("run_id", 0) or 0)
+        if signal_run <= 0 or signal_run != int(run_id):
+            return False, parsed
     if parsed["seq"] <= last_seq:
         return False, parsed
     return True, parsed

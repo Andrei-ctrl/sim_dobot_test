@@ -38,18 +38,27 @@ class RestockingTaskManagerDemo:
         self.robot = Supervisor()
         self.project_root = project_paths.project_root_from_controller_file(__file__)
         self.step = 0
-        self.state = task_mgr.load_state(self.project_root)
         self.run_id = sim_session.begin_run(self.project_root)
+        sort_signal.reset_for_new_run(self.project_root, self.run_id)
+        self.state = task_mgr.load_state(self.project_root)
+        if int(self.state.get("run_id", 0) or 0) != self.run_id:
+            self.state["run_id"] = self.run_id
+            self.state.pop("baseline_shelf_counts", None)
+            self.state.pop("last_shelf_counts", None)
+        # Sim time resets each Webots run; stale trigger times block sorts otherwise.
+        self.state["last_trigger_time"] = {}
+        self.state["last_sort_failure_time"] = {}
         self.state["last_pallet_spawn_time"] = {}
         self.state["awaiting_conveyor_scan"] = {}
         self.state["last_pallet_scan_time"] = {}
         self.state["last_conveyor_scan_seq"] = 0
         spawn_signal.clear_signal(self.project_root)
         task_mgr.save_state(self.project_root, self.state)
-        self.baseline_counts = dict(self.state.get("baseline_shelf_counts") or {})
+        self.baseline_counts = {}
         self.baseline_locked = False
         self.pallet_synced = False
         self.pallet_counts_snapshot = None
+        self.restock_eval_due = False
         self.last_shelf_counts = {}
         self.sim_start_time = self.robot.getTime()
 
@@ -63,9 +72,12 @@ class RestockingTaskManagerDemo:
             f"[TASK MANAGER] Stock pallet rule: replenish via IPR when "
             f"<{task_mgr.PALLET_MIN_BOXES} boxes (target {task_mgr.PALLET_TARGET_BOXES})"
         )
-        print("[TASK MANAGER] Shelf counts source: shelf_monitoring -> data/shelf_counts.json")
+        print(
+            "[TASK MANAGER] Shelf observations: shelf_monitoring -> data/shelf_counts.json"
+        )
+        print("[TASK MANAGER] Sort/restock/spawn tasks: created here only")
         print(f"[TASK MANAGER] Sort queue: {sort_signal.queue_path(self.project_root)}")
-        print(f"[TASK MANAGER] Sim run id={self.run_id} (spawn cooldowns reset)")
+        print(f"[TASK MANAGER] Sim run id={self.run_id} (per-run cooldowns reset)")
 
     def get_from_def(self, name):
         return self.robot.getFromDef(name)
@@ -87,17 +99,34 @@ class RestockingTaskManagerDemo:
             pass
 
     def read_shelf_counts(self):
-        return shelf_mon.read_counts(self.project_root)
+        return shelf_mon.read_counts(self.project_root, run_id=self.run_id)
+
+    def shelf_counts_changed(self, shelf_counts):
+        if not self.last_shelf_counts:
+            return False
+        for product_id in shelf_mon.product_ids():
+            if int(shelf_counts.get(product_id, 0)) != int(
+                self.last_shelf_counts.get(product_id, 0)
+            ):
+                return True
+        return False
 
     def try_lock_baseline(self, shelf_counts):
-        baseline = shelf_mon.read_baseline_counts(self.project_root)
-        if baseline and sum(baseline.values()) > 0:
-            self.baseline_counts = dict(baseline)
-        elif self.step >= BASELINE_WAIT_STEPS and sum(shelf_counts.values()) > 0:
-            self.baseline_counts = dict(shelf_counts)
-        else:
+        if not shelf_mon.shelf_monitoring_ready(
+            self.project_root, min_sim_time=0.5, run_id=self.run_id
+        ):
+            if self.step >= BASELINE_WAIT_STEPS and self.step % 48 == 0:
+                print(
+                    "[TASK MANAGER] Waiting for shelf_monitoring baseline "
+                    f"(run id={self.run_id})..."
+                )
             return False
 
+        baseline = shelf_mon.read_baseline_counts(self.project_root, run_id=self.run_id)
+        if not baseline or sum(baseline.values()) <= 0:
+            return False
+
+        self.baseline_counts = dict(baseline)
         self.state["baseline_shelf_counts"] = dict(self.baseline_counts)
         self.state["last_shelf_counts"] = dict(shelf_counts)
         task_mgr.save_state(self.project_root, self.state)
@@ -175,6 +204,7 @@ class RestockingTaskManagerDemo:
             if boxes:
                 print(f"[TASK MANAGER]   {pallet_def}: {', '.join(boxes)}")
         self.pallet_synced = True
+        self.restock_eval_due = True
         self.apply_pallet_replenish_orders(sim_time)
         self.publish_dashboard(sim_time, self.read_shelf_counts())
 
@@ -266,10 +296,18 @@ class RestockingTaskManagerDemo:
             else:
                 return
 
-        if self.step % CHECK_EVERY_STEPS != 0:
+        shelf_changed = self.shelf_counts_changed(shelf_counts)
+        if (
+            not self.restock_eval_due
+            and not shelf_changed
+            and self.step % CHECK_EVERY_STEPS != 0
+        ):
             return
 
-        self.last_shelf_counts = shelf_counts
+        if self.restock_eval_due:
+            self.restock_eval_due = False
+
+        self.last_shelf_counts = dict(shelf_counts)
         inventory = task_mgr.load_inventory(self.project_root)
         inventory = task_mgr.sync_front_stock_from_shelves(inventory, shelf_counts)
 
@@ -302,6 +340,10 @@ class RestockingTaskManagerDemo:
         )
         for entry in skip_log:
             dashboard_client.append_threshold_log(self.project_root, entry)
+            print(
+                f"[TASK MANAGER] Sort skipped — {entry['product_id']}: "
+                f"{entry['reason']}"
+            )
 
         event = None
         for action in actions:
@@ -320,6 +362,14 @@ class RestockingTaskManagerDemo:
 
         if event is None and threshold_events:
             event = {**threshold_events[0], "t": sim_time}
+            if not actions:
+                for ev in threshold_events:
+                    current = ev.get("current", ev.get("count", ev.get("shelf_items")))
+                    baseline = ev.get("baseline", ev.get("threshold", ev.get("reorder_below")))
+                    print(
+                        f"[TASK MANAGER] Restock needed — {ev['product_id']}: "
+                        f"{ev.get('kind')} current={current} baseline={baseline}"
+                    )
 
         self.publish_dashboard(
             sim_time, shelf_counts, event=event, threshold_events=threshold_events

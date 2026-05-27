@@ -21,8 +21,10 @@ Controllers in this world (same stack as triger_threshold and truck_delivery):
 Data files to watch:
   data/last_failure.json      last robot failure posted to dashboard
   data/threshold_log.json     threshold hits blocked (cooldown, shelf full, …)
-  data/sort_queue.json        sort tasks — status can be failed / skipped_full
+  data/sort_queue.json        sort tasks — cleared each sim run; status failed/skipped_full
+  data/shelf_counts.json      front shelf counts + baseline (includes run_id)
   data/pallet_counts.json     stock pallet box counts
+  data/sim_run.json           monotonic session id (sort/spawn guards)
 
 
 --------------------------------------------------------------------------------
@@ -95,8 +97,8 @@ TEST 5 — Threshold event (no task yet)
 Goal: Dashboard shows threshold_check before a task is created.
 
 Steps:
-  1. Delete 3 front-shelf items for one product (9 → 6).
-  2. Wait for restocking_task_manager tick (~1.5 s).
+  1. Play until baseline shows 9/9, then delete 3 front-shelf items for one product (9 → 6).
+  2. Wait for restocking_task_manager tick (~1.5 s after pallet sync).
 
 Expect:
   Dashboard Last Event: event=threshold_check, kind=shelf_row_missing
@@ -114,8 +116,9 @@ Steps:
   2. Ensure stock pallet has labeled boxes.
 
 Expect:
-  Console:  [STOCK MONITORING] Skip sort — front shelf full (9/9)
-  data/threshold_log.json: reason "no room" or sort_queue skip from stock_monitoring
+  Console:  [STOCK MONITORING] Skip sort — front shelf full (9/9)  [legacy log if re-enabled]
+  OR no sort_queue entries from stock_monitoring (sorts come from task_manager only)
+  data/threshold_log.json: reason "no room" when task_manager skips
   No false inventory restock from scanner (legacy path disabled)
 
 

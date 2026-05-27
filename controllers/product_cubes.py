@@ -248,6 +248,7 @@ def spawn_bottles_on_shelf(
     count=None,
     start_index=None,
     operation_index=0,
+    slot_positions=None,
 ):
     """Supervisor-spawn beer bottles onto shelf slots for one sort operation."""
     product_id = product_id or cube_logic.DEFAULT_PRODUCT_ID
@@ -264,11 +265,14 @@ def spawn_bottles_on_shelf(
     if start_index is None:
         start_index = cube_logic.reserve_next_cube_index(get_from_def)
 
-    positions = cube_logic.shelf_world_positions(
-        shelf_base,
-        product_id=product_id,
-        operation_index=operation_index,
-    )
+    if slot_positions:
+        positions = [list(pos) for pos in slot_positions]
+    else:
+        positions = cube_logic.shelf_world_positions(
+            shelf_base,
+            product_id=product_id,
+            operation_index=operation_index,
+        )
     upright = cube_logic.BOTTLE_UPRIGHT_ROTATION
     spawned = []
 
@@ -299,6 +303,7 @@ def unpack_box_to_shelf(
     product_id=None,
     count=None,
     operation_index=0,
+    slot_positions=None,
 ):
     """Remove carried box and supervisor-place its bottles on the shelf."""
     remove_box(get_from_def, box_def)
@@ -309,6 +314,7 @@ def unpack_box_to_shelf(
         product_id=product_id,
         count=count,
         operation_index=operation_index,
+        slot_positions=slot_positions,
     )
 
 

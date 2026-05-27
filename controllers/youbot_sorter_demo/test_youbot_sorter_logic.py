@@ -218,6 +218,27 @@ class TestShelfSlots(unittest.TestCase):
         inv = {"BEER_BOTTLE": {"shelf_operations": 3}}
         self.assertFalse(logic.shelf_has_capacity(inv, "BEER_BOTTLE"))
 
+    def test_find_empty_middle_row_when_top_and_bottom_full(self):
+        slots = logic.BEER_SHELF_ALL_SLOTS
+        positions = [
+            slots[0],
+            slots[1],
+            slots[2],
+            slots[6],
+            slots[7],
+            slots[8],
+        ]
+        row, targets = logic.find_empty_row_placement(positions, "BEER_BOTTLE")
+        self.assertEqual(row, 1)
+        self.assertEqual(len(targets), 3)
+        self.assertAlmostEqual(targets[0][2], slots[3][2], places=4)
+
+    def test_find_empty_top_row_first(self):
+        row, targets = logic.find_empty_row_placement([], "BEER_BOTTLE")
+        self.assertEqual(row, 0)
+        self.assertEqual(len(targets), 3)
+        self.assertEqual(logic.shelf_row_label(row), "top")
+
 
 class TestProductCubes(unittest.TestCase):
     def test_build_shelf_item_strings(self):

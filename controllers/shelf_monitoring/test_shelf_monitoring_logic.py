@@ -61,6 +61,28 @@ class TestShelfMonitoringLogic(unittest.TestCase):
         self.assertFalse(summary["MILK"]["full"])
         self.assertEqual(summary["MILK"]["free_slots"], 3)
 
+    def test_merge_peak_counts_tracks_max(self):
+        peak = logic.merge_peak_counts({}, {"BEER_BOTTLE": 9, "CHIPS": 9})
+        peak = logic.merge_peak_counts(peak, {"BEER_BOTTLE": 6, "CHIPS": 9})
+        self.assertEqual(peak["BEER_BOTTLE"], 9)
+        self.assertEqual(peak["CHIPS"], 9)
+
+    def test_find_placement_slots_middle_row(self):
+        import youbot_sorter_logic as sorter_logic
+
+        slots = sorter_logic.BEER_SHELF_ALL_SLOTS
+        entries = [
+            (0, "BeerBottle", slots[0]),
+            (1, "BeerBottle", slots[1]),
+            (2, "BeerBottle", slots[2]),
+            (3, "BeerBottle", slots[6]),
+            (4, "BeerBottle", slots[7]),
+            (5, "BeerBottle", slots[8]),
+        ]
+        row, targets = logic.find_placement_slots(entries, "BEER_BOTTLE")
+        self.assertEqual(row, 1)
+        self.assertEqual(len(targets), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

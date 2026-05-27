@@ -1,7 +1,9 @@
-"""File-based sort trigger between stock_monitoring and youBot sorter."""
+"""File-based sort task queue: restocking_task_manager → youBot sorter."""
 
 import json
 import os
+
+import sim_session
 
 SIGNAL_FILENAME = "sort_signal.json"
 QUEUE_FILENAME = "sort_queue.json"
@@ -34,21 +36,40 @@ def read_queue(project_root):
         return []
 
 
-def reset_signal(project_root, clear_queue=False):
-    """Clear stale sort trigger pointer from a previous Webots run.
+def reset_for_new_run(project_root, run_id):
+    """Clear sort queue and pointer when a new Webots session starts."""
+    data_dir = os.path.join(project_root, "data")
+    os.makedirs(data_dir, exist_ok=True)
+    with open(queue_path(project_root), "w", encoding="utf-8") as handle:
+        json.dump([], handle)
+    with open(signal_path(project_root), "w", encoding="utf-8") as handle:
+        json.dump({"seq": 0, "t": 0.0, "run_id": int(run_id)}, handle)
 
-    By default the task queue is preserved so RestockingTaskManager tasks
-    are not wiped when the sorter or stock_monitoring controllers start.
-    """
+
+def reset_signal(project_root, clear_queue=False):
+    """Legacy pointer reset; prefer reset_for_new_run from task_manager."""
     data_dir = os.path.join(project_root, "data")
     os.makedirs(data_dir, exist_ok=True)
     queue = read_queue(project_root)
     baseline = max([int(task.get("seq", 0)) for task in queue], default=0)
+    run_id = sim_session.current_run_id(project_root)
     with open(signal_path(project_root), "w", encoding="utf-8") as handle:
-        json.dump({"seq": baseline, "t": 0.0}, handle)
+        json.dump({"seq": baseline, "t": 0.0, "run_id": run_id}, handle)
     if clear_queue:
         with open(queue_path(project_root), "w", encoding="utf-8") as handle:
             json.dump([], handle)
+
+
+def _task_for_run(task, run_id):
+    if not task:
+        return False
+    session_run = int(run_id)
+    task_run = int(task.get("run_id", 0) or 0)
+    if session_run <= 0:
+        return True
+    if task_run <= 0:
+        return False
+    return task_run == session_run
 
 
 def write_signal(
@@ -65,11 +86,13 @@ def write_signal(
     reason="",
     triggered_by="",
     status="pending",
+    run_id=None,
 ):
     path = signal_path(project_root)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     current = read_signal(project_root) or {}
     sequence = int(current.get("seq", 0)) + 1
+    session_run = int(run_id if run_id is not None else sim_session.current_run_id(project_root))
     payload = {
         "seq": sequence,
         "product_id": product_id,
@@ -83,6 +106,7 @@ def write_signal(
         "reason": reason,
         "triggered_by": triggered_by,
         "status": status,
+        "run_id": session_run,
         "t": sim_time,
     }
     with open(path, "w", encoding="utf-8") as handle:
@@ -95,12 +119,46 @@ def write_signal(
     return payload
 
 
-def pending_tasks(project_root, last_seq):
-    """Return queued sort tasks with seq greater than last_seq."""
-    return [task for task in read_queue(project_root) if int(task.get("seq", 0)) > last_seq]
+def pending_tasks(project_root, last_seq, run_id=None):
+    """Return open queued sort tasks for the current Webots session."""
+    session_run = int(run_id if run_id is not None else sim_session.current_run_id(project_root))
+    pending = []
+    for task in read_queue(project_root):
+        if int(task.get("seq", 0)) <= int(last_seq):
+            continue
+        if not _task_for_run(task, session_run):
+            continue
+        if not task_is_open(task):
+            continue
+        pending.append(task)
+    return pending
 
 
 TERMINAL_TASK_STATUSES = frozenset({"done", "skipped_full", "failed"})
+
+
+def skip_open_tasks_for_product(
+    project_root, product_id, *, run_id=None, status="skipped_full"
+):
+    """Close all pending sort tasks for one product (e.g. shelf already full)."""
+    session_run = int(run_id if run_id is not None else sim_session.current_run_id(project_root))
+    path = queue_path(project_root)
+    queue = read_queue(project_root)
+    skipped = []
+    for task in queue:
+        if task.get("product_id") != product_id:
+            continue
+        if not _task_for_run(task, session_run):
+            continue
+        if not task_is_open(task):
+            continue
+        task["status"] = status
+        skipped.append(int(task.get("seq", 0)))
+    if skipped:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(queue, handle, indent=2)
+    return skipped
 
 
 def mark_task_done(project_root, seq, status="done", sim_time=None):
@@ -124,12 +182,13 @@ def task_is_open(task):
     return task.get("status", "pending") not in TERMINAL_TASK_STATUSES
 
 
-def last_completed_seq(project_root):
-    """Highest seq the sorter has finished (persisted in queue status)."""
+def last_completed_seq(project_root, run_id=None):
+    """Highest seq the sorter has finished for the current Webots session."""
+    session_run = int(run_id if run_id is not None else sim_session.current_run_id(project_root))
     finished = TERMINAL_TASK_STATUSES
     done = [
         int(task.get("seq", 0))
         for task in read_queue(project_root)
-        if task.get("status") in finished
+        if task.get("status") in finished and _task_for_run(task, session_run)
     ]
     return max(done) if done else 0

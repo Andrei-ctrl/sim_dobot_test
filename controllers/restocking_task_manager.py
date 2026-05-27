@@ -498,12 +498,19 @@ def create_spawn_request(project_root, product_id, sim_time, *, reason=""):
     )
 
 
-def has_open_sort_task(project_root, product_id, sort_queue=None):
+def has_open_sort_task(project_root, product_id, sort_queue=None, run_id=None):
     if sort_queue is None and sort_signal is not None:
         sort_queue = sort_signal.read_queue(project_root)
     sort_queue = sort_queue or []
+    if run_id is None and sort_signal is not None:
+        import sim_session
+
+        run_id = sim_session.current_run_id(project_root)
+    session_run = int(run_id or 0)
     for task in sort_queue:
         if task.get("product_id") != product_id:
+            continue
+        if session_run > 0 and int(task.get("run_id", 0) or 0) != session_run:
             continue
         status = task.get("status", "pending")
         if status not in TERMINAL_SORT_STATUSES:
@@ -719,7 +726,13 @@ def evaluate_restock_needs(
             continue
         if not cooldown_elapsed(state, product_id, sim_time):
             if row_missing or threshold_hit:
-                log_skip(product_id, "cooldown", "trigger cooldown active")
+                last = float((state.get("last_trigger_time") or {}).get(product_id, -1e9))
+                remaining = max(0.0, RESTOCK_COOLDOWN_SEC - (sim_time - last))
+                log_skip(
+                    product_id,
+                    "cooldown",
+                    f"trigger cooldown active ({remaining:.1f}s of {RESTOCK_COOLDOWN_SEC:.0f}s)",
+                )
             continue
 
         box_def = ""

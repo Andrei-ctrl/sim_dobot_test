@@ -1,4 +1,4 @@
-"""Supervisor: detect boxes on stock pallets and trigger the sorter."""
+"""Supervisor: detect boxes on stock pallets and publish pallet counts."""
 
 import json
 import os
@@ -17,8 +17,6 @@ for path in (_CONTROLLERS_DIR, _SHELF_MON_DIR):
 import box_routing  # noqa: E402
 import product_routing  # noqa: E402
 import restocking_task_manager as task_mgr  # noqa: E402
-import shelf_monitoring_logic as shelf_mon  # noqa: E402
-import sort_signal  # noqa: E402
 
 TIME_STEP = 32
 PUBLISH_EVERY_STEPS = 48
@@ -39,8 +37,6 @@ class StockMonitoring:
         self.project_root = os.path.dirname(_CONTROLLERS_DIR)
         self.processed = set()
         self.reset_processed_file()
-        self.wait_log_seen = set()
-        sort_signal.reset_signal(self.project_root)
         self.step = 0
         self.sensors = {}
         for name in SENSOR_NAMES:
@@ -93,60 +89,12 @@ class StockMonitoring:
                 return pallet_def
         return None
 
-    def shelf_sort_blocked(self, product_id, cube_count=3):
-        """Return (blocked, reason, mark_processed)."""
-        if not shelf_mon.shelf_monitoring_ready(self.project_root):
-            return True, "waiting for shelf_monitoring baseline", False
-        counts = shelf_mon.read_counts(self.project_root)
-        current = int(counts.get(product_id, 0))
-        maximum = shelf_mon.max_slots_for_product(product_id)
-        if shelf_mon.shelf_is_full(current, product_id):
-            return True, f"front shelf full ({current}/{maximum})", True
-        if not shelf_mon.can_accept_sort(current, product_id, cube_count):
-            return (
-                True,
-                f"no room for {cube_count} items ({current}/{maximum})",
-                True,
-            )
-        return False, "", False
-
-    def trigger_sort(self, box_def, pallet_def, route, had_routing=True):
-        product_id = route["product_id"]
-        blocked, reason, mark_processed = self.shelf_sort_blocked(product_id, cube_count=3)
-        if blocked:
-            if mark_processed:
-                self.processed.add(box_def)
-                self.save_processed()
-                print(
-                    f"[STOCK MONITORING] Skip sort — {product_id}: {reason} "
-                    f"(box {box_def} on {pallet_def})"
-                )
-            elif box_def not in self.wait_log_seen:
-                self.wait_log_seen.add(box_def)
-                print(
-                    f"[STOCK MONITORING] Defer sort — {product_id}: {reason} "
-                    f"(box {box_def} on {pallet_def})"
-                )
+    def note_box_on_pallet(self, box_def, pallet_def, route):
+        """Track pallet boxes; sort tasks are created only by task_manager."""
+        if box_def in self.processed:
             return
-        payload = sort_signal.write_signal(
-            self.project_root,
-            product_id=route["product_id"],
-            source_pallet=pallet_def,
-            cube_count=3,
-            units_per_cube=2,
-            sim_time=self.robot.getTime(),
-            box_def=box_def,
-            task_type="stock_pallet",
-            triggered_by="stock_monitoring",
-        )
         self.processed.add(box_def)
         self.save_processed()
-        routing_note = "" if had_routing else " (no scanner routing on file)"
-        print(
-            f"[STOCK MONITORING] Stock updated on {pallet_def}: "
-            f"{box_def} → {route['product_id']}{routing_note} "
-            f"(sort seq={payload['seq']}, shelf={route['shelf_name']})"
-        )
 
     def count_pallet_boxes_by_product(self):
         counts = {
@@ -201,10 +149,9 @@ class StockMonitoring:
             if pallet_def is None:
                 continue
             route = product_routing.route_for_pallet_def(pallet_def)
-            had_routing = box_routing.read_assignment(self.project_root, box_def) is not None
-            if not had_routing:
+            if box_routing.read_assignment(self.project_root, box_def) is None:
                 continue
-            self.trigger_sort(box_def, pallet_def, route, had_routing=had_routing)
+            self.note_box_on_pallet(box_def, pallet_def, route)
 
     def run(self):
         while self.robot.step(TIME_STEP) != -1:

@@ -285,12 +285,14 @@ class TestEvaluateRestockNeeds(unittest.TestCase):
         self.assertEqual(actions, [])
 
     def test_sort_on_inventory_threshold_without_full_row(self):
+        """Inventory low but shelf has <3 free slots — no sort (need room for one box)."""
         inv = dict(self.inventory)
         inv["BEER_BOTTLE"] = {
             "front_stock": 16,
             "threshold": 20,
             "storage_stock": 10,
         }
+        skip_log = []
         actions = mgr.evaluate_restock_needs(
             self.tmp,
             shelf_counts={"BEER_BOTTLE": 8},
@@ -298,10 +300,10 @@ class TestEvaluateRestockNeeds(unittest.TestCase):
             inventory=inv,
             sim_time=100.0,
             state={"last_trigger_time": {}},
+            skip_log=skip_log,
         )
-        self.assertEqual(len(actions), 1)
-        self.assertEqual(actions[0]["kind"], "sort")
-        self.assertIn("threshold", actions[0]["reason"])
+        self.assertEqual(actions, [])
+        self.assertTrue(any(s.get("reason", "").startswith("no room") for s in skip_log))
 
 
 class TestTaskCreation(unittest.TestCase):
@@ -384,6 +386,46 @@ class TestSortSignalReset(unittest.TestCase):
         self.assertEqual(sort_signal.last_completed_seq(self.tmp), 1)
         pending = sort_signal.pending_tasks(self.tmp, 1)
         self.assertEqual(pending, [])
+
+    def test_skip_open_tasks_for_product(self):
+        sort_signal.write_signal(
+            self.tmp,
+            product_id="MILK",
+            source_pallet="MILK_STOCK",
+            cube_count=3,
+            units_per_cube=2,
+            sim_time=1.0,
+            triggered_by="stock_monitoring",
+            task_type="stock_pallet",
+        )
+        sort_signal.write_signal(
+            self.tmp,
+            product_id="MILK",
+            source_pallet="MILK_STOCK",
+            cube_count=3,
+            units_per_cube=2,
+            sim_time=2.0,
+            triggered_by="stock_monitoring",
+            task_type="stock_pallet",
+        )
+        sort_signal.write_signal(
+            self.tmp,
+            product_id="BEER_BOTTLE",
+            source_pallet="BEER_STOCK",
+            cube_count=3,
+            units_per_cube=2,
+            sim_time=3.0,
+            triggered_by="task_manager",
+            task_type="front_restock",
+        )
+        n = sort_signal.skip_open_tasks_for_product(self.tmp, "MILK")
+        self.assertEqual(len(n), 2)
+        pending = sort_signal.pending_tasks(self.tmp, 0)
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["product_id"], "BEER_BOTTLE")
+        for t in sort_signal.read_queue(self.tmp):
+            if t.get("product_id") == "MILK":
+                self.assertEqual(t.get("status"), "skipped_full")
 
 
 if __name__ == "__main__":

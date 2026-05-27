@@ -21,9 +21,10 @@ FRONT SHELF (per product: BEER_BOTTLE, CHIPS, CHEESE, MILK)
   Sort trigger     At least 1 full row missing vs baseline
                    Example: baseline 9 → sort when count is 6 or less
                    (7 or 8 items = only 1–2 missing → no sort from row rule)
+  Sort trigger     Task manager only (`restocking_task_manager_demo`): one task per
+                   missing row when baseline − current ≥ 3 items
   Sort blocked     When shelf is full (9/9) or no room for next box (+3 items)
-  Inventory file   data/inventory.json → "threshold": 2 per product
-                   (legacy front_stock field; row-missing rule is primary)
+  Pallet monitor   `stock_monitoring` publishes pallet counts only (no sort queue)
 
 STOCK PALLET (warehouse pallet per product)
   Max boxes        5  (PALLET_TARGET_BOXES)
@@ -49,8 +50,12 @@ Where constants live (if you change them, restart Webots):
 2. Open Webots → load worlds/triger_threshold.wbt → Play.
 
 3. Wait ~5–10 s for supervisors to settle:
-     [SHELF MONITORING] Baseline shelf counts
+     [SHELF MONITORING] Baseline shelf counts (peak during settle, run id=...)
+     [TASK MANAGER] Baseline shelf counts (from shelf_monitoring)
      [TASK MANAGER] Pallet box sync at t=...
+
+   Wait until baseline shows 9/9 per product before deleting shelf items for Test B.
+   (If you delete items while paused before Play, baseline locks to the reduced count.)
 
 4. Confirm dashboard "Stock & Shelves" panel shows:
      - Front shelf:  N / 9
@@ -78,7 +83,8 @@ Verify:
     Product row shows 9 / 9 and Status "Shelf full" (orange).
 
   Webots console:
-    [STOCK MONITORING] Skip sort — BEER_BOTTLE: front shelf full (9/9) ...
+    No `[STOCK MONITORING] Stock updated ... sort seq=` lines (pallet monitor only).
+    Task manager may log: Sort skipped — ... shelf full / no room.
 
   data/sort_queue.json:
     No new task for that product.
@@ -108,14 +114,16 @@ Verify:
     CHEESE front shelf shows 6 / 9.
 
   Webots console (one or more of):
-    [TASK MANAGER] ... sort ... CHEESE ... row gap ...
-    [STOCK MONITORING] Stock updated on CHEESE_STOCK: ... sort seq=...
+    [TASK MANAGER] Sort task seq=... product=CHEESE type=front_restock
+    [YOUBOT SORTER] Target shelf row: middle (3 empty slot(s))
 
   data/sort_queue.json:
-    New entry with "product_id": "CHEESE", "task_type": "stock_pallet".
+    New entry with "product_id": "CHEESE", "task_type": "front_restock",
+    "triggered_by": "task_manager".
 
   youBot sorter:
-    [YOUBOT SORTER] ... picks task and navigates to CHEESE_STOCK.
+    Picks one task, navigates to stock pallet, places bottles on the empty row.
+    After shelf reaches 9/9, pending tasks for that product are cleared.
 
 Pass: Sort task appears when count ≤ 6 (with baseline 9), sorter runs when
       boxes exist on CHEESE_STOCK and shelf has room.
@@ -259,9 +267,15 @@ Dashboard shows "- / 5" for stock pallet:
   - Restart dashboard_server.py after code updates.
 
 No sort tasks at 6/9 front shelf:
+  - Wait for baseline log showing 9/9 (peak during settle), then delete 3 items.
   - shelf_monitoring baseline not locked yet — wait for baseline log.
   - No labeled box on stock pallet (box needs routing in data/box_routing.json).
-  - Sort task already pending — check data/sort_queue.json.
+  - Sort task already pending — check data/sort_queue.json (cleared each sim run).
+
+Sorter moves at startup with 9/9 shelves:
+  - Reload World; sort queue is cleared when task manager starts a new sim run.
+  - Check sort_queue.json for stale tasks (triggered_by must be task_manager).
+  - Sorter ignores legacy stock_monitoring tasks automatically.
 
 False spawn orders on world reload:
   - Wait for [TASK MANAGER] Pallet box sync before judging counts.
