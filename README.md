@@ -1,562 +1,231 @@
-# Autonomous Grocery Store Prototype
+# Autonomous Factory / Grocery Simulation
 
-This project is a Webots-based prototype of an autonomous grocery store logistics flow. The prototype demonstrates how a robotic unloading arm, conveyor, product scanner, inventory logic, dashboard server, and restocking decision logic can work together as one information-system scenario.
+Webots R2025a simulation of a small factory logistics pipeline: an IPR arm feeds cardboard boxes onto a conveyor, an upstream scanner tracks them, a KUKA youBot restocker picks boxes and delivers them to a pallet, and optional dashboard/inventory hooks record scan events.
 
-The active world file is:
+**Primary world:** `worlds/Factory_environment_copy_new.wbt`
 
-```text
-worlds/Factory_environment_copy_new.wbt
+## Pipeline overview
+
+```
+IPR (ipr_pick_demo)
+  └─ waits for upstream scanner trigger → spawns SPAWNED_BOX_* at IPR station
+  └─ picks box → places on conveyor_cardbox
+
+Conveyor belt
+  └─ box travels toward youBot pick slot
+
+Scanner (scanner_controller)
+  └─ detects box in upstream zone → routes to BEER_STOCK (all boxes for now)
+  └─ writes data/box_routing.json + data/spawn_signal.json
+
+youBot restocker (youbot_restocker_demo)
+  └─ waits at calibrated home pose beside conveyor
+  └─ wheel-aligns to box center + IR sensor confirm → picks with gripper
+  └─ drives to BEER_STOCK → places box → returns home (wheel drive + snap)
+
+stock_monitoring (stock_monitoring supervisor)
+  └─ detects box on stock pallet → writes data/sort_signal.json
+
+youBot sorter (youbot_sorter_demo)
+  └─ drives to BEER_STOCK → unpacks box → 3 BeerBottle on platform
+  └─ drives to Beer section shelf → places bottles → updates inventory
 ```
 
-## Current Prototype Status
+## Quick start
 
-The current version demonstrates the following end-to-end flow:
+### 1. Python environment
 
-```text
-Beer bottle appears on pallet
-→ IPR robotic arm grips and moves the bottle
-→ bottle is placed on / moved toward the conveyor
-→ product scanner detects the bottle
-→ product is identified as BEER_BOTTLE
-→ dashboard receives scanner data
-→ inventory is updated
-→ restocking threshold is checked
-→ restocking task is created for the youBot restocker
+Use Python 3 with Webots’ controller packages available (or project venv):
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+pip install -r requirements.txt   # if present; Webots supplies controller module
 ```
 
-The console confirms that the main pipeline is working:
+### 2. Optional dashboard
 
-```text
-[SCANNER] Product ID: BEER_BOTTLE
-[SCANNER] Name: Beer Bottle
-[SCANNER] Category: Drinks
-[SCANNER] Target shelf: STORAGE_DRINKS
-[INVENTORY] BEER_BOTTLE: storage=1, front=1, threshold=2
-[RESTOCK TASK] Front shelf below threshold for BEER_BOTTLE
-[RESTOCK TASK] Assign youBot restocker to move item to FRONT_DRINKS
-[RESTOCK COMPLETE] BEER_BOTTLE: storage=0, front=2
+```bash
+python dashboard_server.py
 ```
 
-## Project Structure
+Runs at `http://127.0.0.1:8000`. The scanner POSTs scan events to `/update` when `SEND_TO_DASHBOARD` is enabled in `scanner_controller.py`.
 
-Expected project structure:
+### 3. Open Webots
 
-```text
+Open `worlds/Factory_environment_copy_new.wbt` and run the simulation.
+
+Controllers are assigned in the world file:
+
+| Robot / node | Controller |
+|---|---|
+| `STORE_YOUBOT_RESTOCKER` (YoubotBoxGrip) | `youbot_restocker_demo` |
+| `test_controller_sensor` | `scanner_controller` |
+| `stock_monitoring` | `stock_monitoring` |
+| `BEER STOCK` | `beer_pallet_spawner` (test: spawn box on pallet) |
+| IPR (`IprHd6ms180`) | `ipr_pick_demo` |
+| `youBot sorter` | `youbot_sorter_demo` |
+| Conveyor belts | `conveyor_belt` (Webots built-in) |
+
+## Project structure
+
+```
 sim_dobot_test/
+├── README.md
+├── dashboard_server.py          # optional HTTP dashboard for scanner events
 ├── worlds/
-│   └── Factory_environment_copy_new.wbt
-│
+│   └── Factory_environment_copy_new.wbt   # main factory world
+├── protos/
+│   ├── YoubotBoxGrip.proto      # youBot + IPR gripper
+│   └── IprHd6ms180.proto        # IPR pick arm
 ├── controllers/
-│   ├── ipr_pick_demo/
-│   │   └── ipr_pick_demo.py
-│   │
-│   ├── scanner_controller/
-│   │   └── scanner_controller.py
-│   │
-│   ├── youbot_sorter_demo/
-│   │   └── youbot_sorter_demo.py
-│   │
-│   └── youbot_restocker_demo/
-│       └── youbot_restocker_demo.py
-│
-├── data/
-│   └── inventory.json
-│
-└── dashboard_server.py
+│   ├── youbot_restocker_demo/   # restocker (main pick-and-place logic)
+│   ├── scanner_controller/      # upstream conveyor scanner
+│   ├── ipr_pick_demo/           # IPR box spawn + pick-to-conveyor
+│   ├── spawn_signal.py          # file IPC: scanner → IPR spawner
+│   ├── youbot_sorter_demo/      # idle sorter placeholder
+│   └── …                        # other demos (grocery, e6_twin, pallet, etc.)
+└── data/
+    ├── spawn_signal.json        # conveyor scanner → IPR spawn trigger
+    ├── inventory.json           # scanner inventory updates
+    ├── products.json
+    └── shelf_mapping.json
 ```
 
-## Main Components
+## Main controllers
 
-### 1. Webots World
+### `youbot_restocker_demo`
 
-File:
+Full restocker implementation with mecanum navigation and sensor-guided pickup.
 
-```text
-worlds/Factory_environment_copy_new.wbt
+- **Files:** `youbot_restocker_demo.py`, `youbot_restocker_logic.py`, `YoubotRestockerDemo.txt`
+- **Robot:** `DEF STORE_YOUBOT_RESTOCKER` (YoubotBoxGrip)
+- **Stock pallets:** `DEF BEER_STOCK`, `CHIPS_STOCK`, `CHEESE_STOCK`, `MILK_STOCK`
+- **Monitoring:** `stock_monitoring` supervisor → `sort_signal.json`
+
+Key behavior:
+
+- Three-stage box detection (arm IR sensor, upstream scanner tracking, physical fallback)
+- `ALIGN_TO_BOX` — mecanum fine-align to measured box center before grasp
+- `SENSOR_CONFIRM` — IR sensor on arm5 must see box at hover height
+- Returns to exact home pose via `snap_to_home_pose()` after each cycle
+- Removes delivered box from world; respects `MAX_LIVE_BOXES = 3`
+
+Detailed state machine, tuning parameters, and function reference:
+
+→ `controllers/youbot_restocker_demo/YoubotRestockerDemo.txt`
+
+**Run unit tests:**
+
+```bash
+cd controllers/youbot_restocker_demo
+python test_youbot_restocker_demo.py
 ```
 
-This world contains the factory/grocery-store simulation environment, including:
+### `scanner_controller`
 
-- IPR robotic arm for unloading products from the pallet
-- beer bottle product object
-- pallet area
-- conveyor belts
-- scanner robot with a distance sensor
-- youBot sorter
-- youBot restocker
-- shelves and store environment objects
-- prototype conveyor/detection zones
+Upstream conveyor scanner on robot `test_controller_sensor`.
 
-The world must include an importable BeerBottle PROTO because the controller dynamically spawns bottles:
+- Detects `SPAWNED_BOX_*` entering zone at `(-0.01, 1.09)` radius `0.8 m`
+- Logs pick-slot arrival at fixed youBot pick coordinates
+- Writes `data/spawn_signal.json` to trigger IPR spawner (one box per scan, capped by live box count)
+- Optionally POSTs events to dashboard and updates `data/inventory.json`
 
-```vrml
-IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/drinks/protos/BeerBottle.proto"
+**Tests:**
+
+```bash
+cd controllers/scanner_controller
+python test_scanner_controller.py
 ```
 
-### 2. IPR Robotic Arm Controller
+### `ipr_pick_demo`
 
-Controller:
+IPR arm supervisor: spawns cardboard boxes and places them on the conveyor.
 
-```text
-controllers/ipr_pick_demo/ipr_pick_demo.py
-```
+- **Does not** spawn on startup — waits at home until conveyor scanner triggers via `spawn_signal.json`
+- One seed box (`SPAWNED_BOX_0`) on the conveyor in the world bootstraps the first scanner event
+- Pick cycle: home → pick spawned box → lift → move to conveyor → release → wait for next spawn
 
-Purpose:
+### `spawn_signal.py`
 
-- controls the `IprHd6ms180` robotic arm
-- opens and closes the gripper
-- uses a sequence of predefined poses
-- picks the beer bottle from the pallet
-- moves it toward the conveyor
-- spawns the next beer bottle after the movement cycle
-
-The IPR arm uses the following motor names:
-
-```text
-base
-upperarm
-forearm
-wrist
-rotational_wrist
-gripper::left
-gripper::right
-```
-
-The pose format is:
-
-```python
-("pose_name", [base, upperarm, forearm, wrist, rotational_wrist], gripper_value, duration)
-```
-
-Example:
-
-```python
-("pre_pick", [0.0, -2, 1, -1, 0.0], 1.0, 160)
-```
-
-Meaning:
-
-```text
-base = base rotation
-upperarm = main arm movement
-forearm = elbow movement
-wrist = wrist bend
-rotational_wrist = gripper rotation
-gripper_value = 1.0 open, 0.0 closed
-duration = number of simulation steps
-```
-
-### 3. Bottle Spawner
-
-The bottle spawner is implemented inside:
-
-```text
-controllers/ipr_pick_demo/ipr_pick_demo.py
-```
-
-It uses the Webots Supervisor API:
-
-```python
-self.children.importMFNodeFromString(-1, node_string)
-```
-
-The spawned product is a real `BeerBottle` PROTO object:
-
-```vrml
-DEF DEMO_BOTTLE_0 BeerBottle {
-  translation ...
-  rotation ...
-  name "BEER_BOTTLE"
-  mass 0.1
-}
-```
-
-Important implementation note:
-
-`BeerBottle` does not support `customData`, so product identification is handled using:
-
-```vrml
-name "BEER_BOTTLE"
-```
-
-or by detecting DEF names such as:
-
-```text
-DEMO_BOTTLE
-DEMO_BOTTLE_0
-DEMO_BOTTLE_1
-...
-```
-
-### 4. Product Scanner
-
-Controller:
-
-```text
-controllers/scanner_controller/scanner_controller.py
-```
-
-Purpose:
-
-- loads the Webots distance sensor
-- detects when a product enters the scanner zone
-- identifies product type
-- sends scan data to the dashboard server
-- updates inventory
-- triggers restocking decision logic
-
-The scanner currently identifies the beer bottle as:
-
-```text
-Product ID: BEER_BOTTLE
-Name: Beer Bottle
-Category: Drinks
-Target shelf: STORAGE_DRINKS
-```
-
-The scanner uses a product database similar to:
-
-```python
-self.product_database = {
-    "BEER_BOTTLE": {
-        "name": "Beer Bottle",
-        "category": "Drinks",
-        "target_shelf": "STORAGE_DRINKS"
-    }
-}
-```
-
-### 5. Inventory System
-
-Inventory file:
-
-```text
-data/inventory.json
-```
-
-Example structure:
+Shared file-based signal between scanner and IPR:
 
 ```json
-{
-  "BEER_BOTTLE": {
-    "name": "Beer Bottle",
-    "category": "Drinks",
-    "storage_stock": 0,
-    "front_stock": 2,
-    "threshold": 2,
-    "storage_shelf": "STORAGE_DRINKS",
-    "front_shelf": "FRONT_DRINKS"
-  }
-}
+{"seq": 1, "box_def": "SPAWNED_BOX_0", "t": 12.5}
 ```
 
-The scanner updates the inventory after product scanning.
+IPR reads `seq` and spawns the next `SPAWNED_BOX_N` only when the sequence increments.
 
-Current logic:
+### `dashboard_server.py`
 
-```text
-If BEER_BOTTLE is scanned:
-    storage_stock increases
-    if front_stock < threshold:
-        create restocking task
-        move one item from storage_stock to front_stock
-```
+Minimal HTTP server:
 
-Example console output:
+| Route | Method | Purpose |
+|---|---|---|
+| `/`, `/index.html` | GET | Dashboard page |
+| `/latest` | GET | Latest scanner payload |
+| `/update` | POST | Receive JSON from scanner |
 
-```text
-[INVENTORY] BEER_BOTTLE: storage=1, front=1, threshold=2
-[RESTOCK TASK] Front shelf below threshold for BEER_BOTTLE
-[RESTOCK TASK] Assign youBot restocker to move item to FRONT_DRINKS
-[RESTOCK COMPLETE] BEER_BOTTLE: storage=0, front=2
-```
+### Other controllers
 
-### 6. Dashboard Server
+| Controller | Role |
+|---|---|
+| `youbot_sorter_demo` | Idle placeholder for sorter youBot |
+| `grocery_supervisor` | Grocery store workflow (alternate world) |
+| `minimal_store_supervisor` | Minimal store demo |
+| `box_spawner` | Standalone timed box spawner (not used in main world) |
+| `e6_twin/` | ME6 robot twin / IK demo (separate subsystem) |
 
-File:
+## Calibrated poses (restocker)
 
-```text
-dashboard_server.py
-```
+| Name | Translation (x, y, z) |
+|---|---|
+| Restocker home | `-1.87451, 0.55379, 0.10346` |
+| Box pick slot | `-1.25034, 0.58500, 0.19861` |
 
-Purpose:
+Constants live in `controllers/youbot_restocker_demo/youbot_restocker_logic.py` (`RESTOCKER_HOME_*`, `FIXED_PICK_BOX_POS`).
 
-- runs a local HTTP server
-- receives scanner updates from Webots controllers
-- displays latest scanner/inventory data in the browser
+## Data files
 
-Run it before starting the Webots simulation:
+| File | Purpose |
+|---|---|
+| `data/spawn_signal.json` | Scanner → IPR spawn trigger (sequence counter) |
+| `data/inventory.json` | Stock levels updated by scanner |
+| `data/products.json` | Product catalog (grocery demos) |
+| `data/shelf_mapping.json` | Shelf assignments (grocery demos) |
 
-```bash
-python dashboard_server.py
-```
+## Requirements
 
-Open the dashboard at:
+- [Webots R2025a](https://cyberbotics.com/) or later
+- Python 3.10+
+- Webots Python API (`controller` module — provided by Webots when controllers run inside the simulator)
 
-```text
-http://127.0.0.1:8000
-```
+## Troubleshooting
 
-Do not open `/update` directly in the browser. That endpoint is for POST requests from the scanner controller.
+**Webots crashes at “pre-finalizing nodes”**
 
-### 7. youBot Controllers
+- Reload a clean world; avoid saving mid-simulation with many colliding boxes
+- World file should not contain duplicate `DEF SPAWNED_BOX_*` names or stale `hidden` velocity fields
+- `MAX_LIVE_BOXES = 3` limits runtime spawns; restocker removes boxes after pallet delivery
 
-Controllers:
+**IPR does not spawn boxes**
 
-```text
-controllers/youbot_sorter_demo/youbot_sorter_demo.py
-controllers/youbot_restocker_demo/youbot_restocker_demo.py
-```
+- `CardboardBox` must be `IMPORTABLE EXTERNPROTO` in the world file for runtime spawn
+- Check console for `Could not spawn SPAWNED_BOX_*` — usually missing IMPORTABLE proto
+- Ensure seed box on conveyor passes scanner so `spawn_signal.json` seq increments
 
-Current role:
+**Restocker misses pick**
 
-- safe idle controllers
-- keep the youBots active in the simulation
-- print startup messages
-- planned to be connected to restocking/sorting task logic later
+- Verify home pose matches calibrated `RESTOCKER_HOME_TRANSLATION` in world and logic file
+- Check `[YOUBOT RESTOCKER DIAG]` logs for detection stage (1/2/3)
+- See `YoubotRestockerDemo.txt` for alignment and sensor tuning parameters
 
-Current console output:
+**Sensor reads ~3700 (self-hit)**
 
-```text
-[YOUBOT SORTER] Safe idle controller started
-[YOUBOT RESTOCKER] Safe idle controller started
-```
+- Arm is hitting itself, not the box — ignored above `SENSOR_MAX_VALID = 3200`
+- Wait for `SENSOR_CONFIRM` or wheel align to finish before descend
 
-## How to Run
+## Further reading
 
-1. Start the dashboard server:
-
-```bash
-cd C:\Users\andru\Desktop\sim_dobot_test
-python dashboard_server.py
-```
-
-2. Open Webots.
-
-3. Open the world:
-
-```text
-worlds/Factory_environment_copy_new.wbt
-```
-
-4. Run/reset the simulation.
-
-5. Check the Webots console for:
-
-```text
-[IPR] Pick demo initialized
-[SCANNER] Product scanner started.
-[SCANNER] Product ID: BEER_BOTTLE
-[INVENTORY] ...
-[RESTOCK TASK] ...
-```
-
-6. Open the dashboard:
-
-```text
-http://127.0.0.1:8000
-```
-
-## Known Warnings
-
-The simulation currently shows repeated Webots warnings such as:
-
-```text
-too low requested position: -3.65949e-11 < 0
-too low requested position: -1.26847e-11 < 0
-```
-
-These are very small numerical values close to zero. They mainly come from youBot finger motors or small joint limit rounding errors. They do not currently prevent the prototype from running.
-
-There may also be a warning:
-
-```text
-Robot "test_controller_sensor": The remote control library has not been found.
-```
-
-This should be cleaned later by removing the old unused `test_controller_sensor` node or making sure only the active `PRODUCT_SCANNER` node uses the scanner controller.
-
-## What Works
-
-The following features currently work:
-
-- Webots world loads.
-- IPR robotic arm controller starts.
-- IPR motors and grippers are detected.
-- IPR pose sequence runs.
-- Bottle spawner works.
-- BeerBottle objects can be spawned dynamically.
-- Scanner controller starts.
-- Distance sensor loads.
-- Product is detected.
-- Product is identified as `BEER_BOTTLE`.
-- Dashboard server receives scanner data.
-- Inventory file is updated.
-- Restocking threshold logic works.
-- Restocking task is printed for the youBot restocker.
-
-## What Is Left To Do
-
-### High Priority
-
-1. Clean the scanner placement.
-
-   The scanner currently still appears to report an old position in some logs:
-
-   ```text
-   Scanner position: [-0.01, 1.09, 0.24]
-   ```
-
-   It should be moved near the actual conveyor path where the bottle passes.
-
-2. Remove or rename the old `test_controller_sensor` node.
-
-   The active scanner should have a clear DEF/name such as:
-
-   ```vrml
-   DEF PRODUCT_SCANNER Robot {
-     name "product scanner"
-     controller "scanner_controller"
-     supervisor TRUE
-   }
-   ```
-
-3. Make youBot restocker react visually.
-
-   Current restocking is logical only. The next implementation step is to make the youBot restocker move or animate when a restocking task is created.
-
-4. Add a task queue.
-
-   Create a file such as:
-
-   ```text
-   data/tasks.json
-   ```
-
-   Example task:
-
-   ```json
-   {
-     "task_id": 1,
-     "type": "RESTOCK",
-     "product_id": "BEER_BOTTLE",
-     "from": "STORAGE_DRINKS",
-     "to": "FRONT_DRINKS",
-     "assigned_robot": "STORE_YOUBOT_RESTOCKER",
-     "status": "pending"
-   }
-   ```
-
-### Medium Priority
-
-5. Add more product types.
-
-   Example:
-
-   ```text
-   MILK_BOTTLE
-   CEREAL_BOX
-   WATER_BOTTLE
-   ```
-
-   Each should have its own category, storage shelf, front shelf, and threshold.
-
-6. Improve the dashboard.
-
-   The dashboard should show:
-
-   - latest scanned product
-   - inventory table
-   - pending restocking tasks
-   - robot status
-   - scanner status
-
-7. Add visual labels in Webots.
-
-   Add signs or colored zones for:
-
-   - pallet pickup area
-   - scanner zone
-   - conveyor
-   - storage shelf
-   - front shelf
-
-8. Reduce console warnings.
-
-   Clamp tiny negative values in the youBot controllers and remove unused test nodes.
-
-### Optional / Advanced
-
-9. Replace hardcoded pose sequence with task states.
-
-   Instead of only cycling through poses, define robot states:
-
-   ```text
-   WAITING_FOR_PRODUCT
-   PICKING
-   MOVING_TO_CONVEYOR
-   RELEASING
-   RETURNING_HOME
-   ```
-
-10. Use Webots Emitter/Receiver for task communication.
-
-   Scanner can emit a task message to the youBot restocker instead of only writing a JSON file.
-
-11. Add better physical product handling.
-
-   The current BeerBottle physics is acceptable for prototype demonstration, but gripping can still be sensitive. It can be improved by:
-
-   - tuning gripper values
-   - lowering arm velocity
-   - simplifying product bounding objects
-   - adding stable pickup fixtures
-
-12. Add logging.
-
-   Create logs such as:
-
-   ```text
-   data/events.log
-   ```
-
-   Each scan, inventory update, and robot action can be recorded.
-
-## Prototype Explanation
-
-This prototype demonstrates a simplified autonomous grocery-store process. The IPR robot unloads beer bottles from a pallet and places them onto a conveyor. A scanner identifies the product using its object name or DEF pattern and maps it to a product database. The scanner then updates a JSON-based inventory file and checks whether the front shelf stock is below the configured threshold. If restocking is needed, the system creates a logical restocking task for the youBot restocker.
-
-The current implementation focuses on showing the integration between robotics simulation and information-system logic: product identification, inventory updates, stock threshold monitoring, and task assignment.
-
-## Current Limitations
-
-- Product recognition is simulated using object names/DEF names, not computer vision.
-- Inventory is stored in a local JSON file, not a real database.
-- Restocking task execution is currently logical/console-based.
-- youBots do not yet physically move products between shelves.
-- Some object positions and scanner coordinates are still hardcoded.
-- The simulation still contains some old test nodes and warnings that should be cleaned before final submission.
-
-## Recommended Next Milestone
-
-The next milestone should be:
-
-```text
-Scanner detects BEER_BOTTLE
-→ inventory creates RESTOCK task
-→ task is written to data/tasks.json
-→ youBot restocker reads task
-→ youBot performs a simple visible restocking animation
-→ dashboard shows task status changing from pending to completed
-```
-
-This would make the prototype clearly demonstrate the full process:
-
-```text
-delivery unloading
-→ product identification
-→ inventory update
-→ restocking decision
-→ robot task assignment
-→ restocking execution
-```
+- Restocker deep dive: `controllers/youbot_restocker_demo/YoubotRestockerDemo.txt`
+- ME6 twin / IK: `controllers/e6_twin/README.md`

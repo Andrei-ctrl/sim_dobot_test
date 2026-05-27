@@ -1,0 +1,163 @@
+"""Supervisor: detect boxes on stock pallets and trigger the sorter."""
+
+import json
+import os
+import sys
+
+from controller import Supervisor
+
+_CONTROLLERS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SHELF_MON_DIR = os.path.join(_CONTROLLERS_DIR, "shelf_monitoring")
+for path in (_CONTROLLERS_DIR, _SHELF_MON_DIR):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+import box_routing  # noqa: E402
+import product_routing  # noqa: E402
+import shelf_monitoring_logic as shelf_mon  # noqa: E402
+import sort_signal  # noqa: E402
+
+TIME_STEP = 32
+PROCESSED_FILENAME = "stock_processed.json"
+SENSOR_NAMES = (
+    "stock_monitoring_beer",
+    "stock_monitoring_chips",
+    "stock_monitoring_cheese",
+    "stock_monitoring_milk",
+)
+
+
+class StockMonitoring:
+    def __init__(self):
+        self.robot = Supervisor()
+        self.project_root = os.path.dirname(_CONTROLLERS_DIR)
+        self.processed = set()
+        self.reset_processed_file()
+        self.wait_log_seen = set()
+        sort_signal.reset_signal(self.project_root)
+        self.sensors = {}
+        for name in SENSOR_NAMES:
+            device = self.robot.getDevice(name)
+            if device is not None:
+                device.enable(TIME_STEP)
+                self.sensors[name] = device
+        print(
+            f"[STOCK MONITORING] Started; zone radius "
+            f"{product_routing.PALLET_ZONE_RADIUS}m, "
+            f"sensors={list(self.sensors.keys()) or 'zone-only'}"
+        )
+
+    def processed_path(self):
+        return os.path.join(self.project_root, "data", PROCESSED_FILENAME)
+
+    def load_processed(self):
+        path = self.processed_path()
+        try:
+            with open(path, encoding="utf-8") as handle:
+                data = json.load(handle)
+                return set(data) if isinstance(data, list) else set()
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return set()
+
+    def reset_processed_file(self):
+        path = self.processed_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump([], handle)
+
+    def save_processed(self):
+        path = self.processed_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(sorted(self.processed), handle, indent=2)
+
+    def iter_boxes(self):
+        for index in range(100):
+            box_def = f"{product_routing.BOX_DEF_PREFIX}{index}"
+            node = self.robot.getFromDef(box_def)
+            if node is None:
+                continue
+            pos = list(node.getField("translation").getSFVec3f())
+            yield box_def, pos
+
+    def pallet_for_box(self, box_pos):
+        for pallet_def in product_routing.iter_pallet_defs():
+            if product_routing.box_on_pallet(box_pos, pallet_def):
+                return pallet_def
+        return None
+
+    def shelf_sort_blocked(self, product_id, cube_count=3):
+        """Return (blocked, reason, mark_processed)."""
+        if not shelf_mon.shelf_monitoring_ready(self.project_root):
+            return True, "waiting for shelf_monitoring baseline", False
+        counts = shelf_mon.read_counts(self.project_root)
+        current = int(counts.get(product_id, 0))
+        maximum = shelf_mon.max_slots_for_product(product_id)
+        if shelf_mon.shelf_is_full(current, product_id):
+            return True, f"front shelf full ({current}/{maximum})", True
+        if not shelf_mon.can_accept_sort(current, product_id, cube_count):
+            return (
+                True,
+                f"no room for {cube_count} items ({current}/{maximum})",
+                True,
+            )
+        return False, "", False
+
+    def trigger_sort(self, box_def, pallet_def, route, had_routing=True):
+        product_id = route["product_id"]
+        blocked, reason, mark_processed = self.shelf_sort_blocked(product_id, cube_count=3)
+        if blocked:
+            if mark_processed:
+                self.processed.add(box_def)
+                self.save_processed()
+                print(
+                    f"[STOCK MONITORING] Skip sort — {product_id}: {reason} "
+                    f"(box {box_def} on {pallet_def})"
+                )
+            elif box_def not in self.wait_log_seen:
+                self.wait_log_seen.add(box_def)
+                print(
+                    f"[STOCK MONITORING] Defer sort — {product_id}: {reason} "
+                    f"(box {box_def} on {pallet_def})"
+                )
+            return
+        payload = sort_signal.write_signal(
+            self.project_root,
+            product_id=route["product_id"],
+            source_pallet=pallet_def,
+            cube_count=3,
+            units_per_cube=2,
+            sim_time=self.robot.getTime(),
+            box_def=box_def,
+            task_type="stock_pallet",
+            triggered_by="stock_monitoring",
+        )
+        self.processed.add(box_def)
+        self.save_processed()
+        routing_note = "" if had_routing else " (no scanner routing on file)"
+        print(
+            f"[STOCK MONITORING] Stock updated on {pallet_def}: "
+            f"{box_def} → {route['product_id']}{routing_note} "
+            f"(sort seq={payload['seq']}, shelf={route['shelf_name']})"
+        )
+
+    def check_pallets(self):
+        for box_def, box_pos in self.iter_boxes():
+            if box_def in self.processed:
+                continue
+            pallet_def = self.pallet_for_box(box_pos)
+            if pallet_def is None:
+                continue
+            route = product_routing.route_for_pallet_def(pallet_def)
+            had_routing = box_routing.read_assignment(self.project_root, box_def) is not None
+            if not had_routing:
+                continue
+            self.trigger_sort(box_def, pallet_def, route, had_routing=had_routing)
+
+    def run(self):
+        while self.robot.step(TIME_STEP) != -1:
+            self.check_pallets()
+
+
+if __name__ == "__main__":
+    StockMonitoring().run()

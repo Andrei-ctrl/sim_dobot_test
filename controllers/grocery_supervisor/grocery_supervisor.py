@@ -29,13 +29,13 @@ class GrocerySupervisor:
         self.active_products = []
 
         # Webots uses Z as the vertical axis.
-        self.puma_pick_position = [8.35, 2.1, 0.42]
-        self.puma_lift_position = [8.35, 2.1, 0.9]
-        self.puma_carry_position = [7.8, 1.25, 0.78]
+        self.ipr_pick_position = [8.35, 2.1, 0.42]
+        self.ipr_lift_position = [8.35, 2.1, 0.9]
+        self.ipr_carry_position = [7.8, 1.25, 0.78]
+        self.ipr_pick_steps = 210
         self.conveyor_start_position = [7.55, 0.54, 0.28]
         self.detection_position = [2.25, 0.54, 0.28]
         self.conveyor_step = -0.012
-        self.puma_pick_steps = 210
         self.sorter_pick_steps = 90
         self.sort_move_steps = 100
         self.restock_wait_steps = 80
@@ -129,6 +129,77 @@ class GrocerySupervisor:
         self.product_count += 1
 
         print(f"[SPAWN] Product {product_id} created at delivery zone")
+        
+    def get_spawned_box_defs(self):
+        return [f"SPAWNED_BOX_{i}" for i in range(100)]
+
+
+    def is_box_on_pallet3(self, box):
+        position = box.getField("translation").getSFVec3f()
+
+        dx = position[0] - self.pallet3_position[0]
+        dy = position[1] - self.pallet3_position[1]
+
+        distance_xy = (dx * dx + dy * dy) ** 0.5
+        return distance_xy < 0.5
+
+
+    def spawn_five_bottles_on_pallet3(self):
+        print("[BOTTLE SPAWNER] Box detected on pallet(3)")
+        print("[BOTTLE SPAWNER] Spawning 5 bottles")
+
+        offsets = [
+            [0.00, 0.00, 0.15],
+            [0.10, 0.00, 0.15],
+            [-0.10, 0.00, 0.15],
+            [0.00, 0.10, 0.15],
+            [0.00, -0.10, 0.15],
+        ]
+
+        for offset in offsets:
+            bottle_def = f"PALLET3_BOTTLE_{self.bottle_count}"
+
+            x = self.bottle_spawn_position[0] + offset[0]
+            y = self.bottle_spawn_position[1] + offset[1]
+            z = self.bottle_spawn_position[2] + offset[2]
+
+            node_string = f"""
+            DEF {bottle_def} BeerBottle {{
+            translation {x} {y} {z}
+            rotation {self.bottle_spawn_rotation[0]} {self.bottle_spawn_rotation[1]} {self.bottle_spawn_rotation[2]} {self.bottle_spawn_rotation[3]}
+            name "BEER_BOTTLE"
+            mass 0.1
+            }}
+            """
+
+            self.children.importMFNodeFromString(-1, node_string)
+
+            new_bottle = self.robot.getFromDef(bottle_def)
+
+            if new_bottle is not None:
+                print(f"[BOTTLE SPAWNER] Spawned bottle: {bottle_def}")
+            else:
+                print(f"[BOTTLE SPAWNER ERROR] Could not spawn {bottle_def}")
+
+            self.bottle_count += 1
+
+        print("[BOTTLE SPAWNER] Spawned 5 bottles")
+
+
+    def check_boxes_on_pallet3(self):
+        for box_def in self.get_spawned_box_defs():
+            if box_def in self.processed_boxes:
+                continue
+
+            box = self.robot.getFromDef(box_def)
+
+            if box is None:
+                continue
+
+            if self.is_box_on_pallet3(box):
+                print(f"[SORTER] Box reached pallet(3): {box_def}")
+                self.spawn_five_bottles_on_pallet3()
+                self.processed_boxes.add(box_def)
 
     def move_agent(self, node, position):
         if node is not None:
@@ -151,34 +222,34 @@ class GrocerySupervisor:
             if product["state"] == "WAITING_FOR_PUMA":
                 product["timer"] += 1
                 if product["timer"] == 1:
-                    print(f"[PUMA PICK] PUMA picks {product['product_id']}")
+                    print(f"[IPR PICK] IPR picks {product['product_id']}")
 
-                phase = product["timer"] / self.puma_pick_steps
+                phase = product["timer"] / self.ipr_pick_steps
                 if phase < 0.35:
-                    self.set_product_position(product, self.puma_pick_position)
+                    self.set_product_position(product, self.ipr_pick_position)
                 elif phase < 0.6:
                     progress = (phase - 0.35) / 0.25
                     self.set_product_position(
                         product,
-                        self.interpolate(self.puma_pick_position, self.puma_lift_position, progress),
+                        self.interpolate(self.ipr_pick_position, self.ipr_lift_position, progress),
                     )
                 elif phase < 0.85:
                     progress = (phase - 0.6) / 0.25
                     self.set_product_position(
                         product,
-                        self.interpolate(self.puma_lift_position, self.puma_carry_position, progress),
+                        self.interpolate(self.ipr_lift_position, self.ipr_carry_position, progress),
                     )
                 elif phase < 1.0:
                     progress = (phase - 0.85) / 0.15
                     self.set_product_position(
                         product,
-                        self.interpolate(self.puma_carry_position, self.conveyor_start_position, progress),
+                        self.interpolate(self.ipr_carry_position, self.conveyor_start_position, progress),
                     )
                 else:
                     self.set_product_position(product, self.conveyor_start_position)
                     product["state"] = "ON_CONVEYOR"
                     product["timer"] = 0
-                    print(f"[PUMA PLACE] {product['product_id']} placed on conveyor")
+                    print(f"[IPR PLACE] {product['product_id']} placed on conveyor")
                 continue
 
             if product["state"] != "ON_CONVEYOR":
@@ -294,13 +365,16 @@ class GrocerySupervisor:
 
     def run(self):
         while self.robot.step(TIME_STEP) != -1:
-            self.spawn_timer += 1
-
-            if self.spawn_timer > 240:
-                self.spawn_product()
-                self.spawn_timer = 0
+            # Old random grocery product flow disabled for box -> pallet(3) -> bottles demo.
+            # Uncomment if you want the old generic product flow again.
+            #
+            # self.spawn_timer += 1
+            # if self.spawn_timer > 240:
+            #     self.spawn_product()
+            #     self.spawn_timer = 0
 
             self.move_products_on_conveyor()
+            self.check_boxes_on_pallet3()
 
 
 if __name__ == "__main__":

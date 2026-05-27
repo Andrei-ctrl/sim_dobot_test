@@ -16,8 +16,9 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/pallet/protos/WoodenPallet.proto"
 IMPORTABLE EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/drinks/protos/BeerBottle.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/kuka/youbot/protos/Youbot.proto"
+EXTERNPROTO "../protos/YoubotBoxGrip.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/softbank/nao/protos/Shelves.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/neuronics/ipr/protos/IprHd6ms180.proto"
+EXTERNPROTO "../protos/IprHd6ms180.proto"
 
 WorldInfo {
   info [
@@ -36,11 +37,27 @@ WorldInfo {
         0.5
       ]
     }
+    ContactProperties {
+      material1 "InteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation -0.785398 0
+      bounce 0
+    }
+    ContactProperties {
+      material1 "ExteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation 0.785398 0
+      bounce 0
+    }
   ]
 }
 Viewpoint {
-  orientation 0.5929076945304268 0.1779955941370266 -0.7853521721077881 2.668582126822645
-  position 9.554454349085757 1.4396411488990788 5.272925574274823
+  orientation -0.011422164354666503 -0.9999028102864295 0.007994006677237292 5.421598425377909
+  position -4.191509817259973 1.5834900435495698 3.626271193125593
   exposure 1.7
 }
 TexturedBackground {
@@ -54,6 +71,20 @@ Floor {
 Shelves {
   translation -17 1 0
   name "shelves(1)"
+}
+DEF STORAGE_DRINKS Pose {
+  translation -17 1 0.85
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.2 0.5 0.9
+        transparency 0.85
+      }
+      geometry Box {
+        size 0.35 0.35 0.02
+      }
+    }
+  ]
 }
 Shelves {
   translation -17 2 0
@@ -75,81 +106,49 @@ Shelves {
   translation -17 6 0
   name "shelves(6)"
 }
-DEF STORE_YOUBOT_SORTER Youbot {
-  hidden position_0_0 2.1959734054633745e-08
-  hidden position_0_1 7.311197358149114e-09
-  hidden position_0_2 3.550440579883506e-08
-  hidden position_0_3 2.8312411334354183e-08
-  hidden linearVelocity_0 -1.6402622637485465e-06 1.5082598920585269e-07 6.7399581318466515e-09
-  hidden angularVelocity_0 4.460823810423273e-07 1.354215823933846e-06 2.6932697820601452e-06
-  hidden position_1_0 -1.0321310630824728e-05
-  hidden rotation_2 0 0 -1 0.1347872269480674
-  hidden position_2_0 1.4838198483868646e-06
-  hidden linearVelocity_2 -1.3478742780623487e-06 -4.7167022092141085e-07 2.3383674088261533e-07
-  hidden angularVelocity_2 4.400060956601112e-07 1.3548404333275194e-06 8.415896572473937e-06
-  hidden rotation_3 0 -1 0 1.483844433367835e-06
-  hidden position_3_0 2.3858969731499285e-06
-  hidden linearVelocity_3 -1.532656364166842e-06 -6.234497066172087e-07 2.6961925445322297e-07
-  hidden angularVelocity_3 5.029818253856425e-07 1.8181383253142626e-06 8.415880360191092e-06
-  hidden rotation_4 0 -1 0 2.3858615827115323e-06
-  hidden position_4_0 -2.493421528682191e-08
-  hidden linearVelocity_4 -7.854730191961208e-07 -7.617884587840823e-07 2.569018950005584e-07
-  hidden angularVelocity_4 6.109619130220047e-07 2.6090534925496515e-06 8.4158968558333e-06
-  hidden rotation_5 0 1 0 2.9802322387695313e-08
-  hidden position_5_0 9.578204786962949e-10
-  hidden linearVelocity_5 -7.226947148350581e-07 -7.949177939693494e-07 2.629259519462016e-07
-  hidden angularVelocity_5 6.109223465327142e-07 2.6090469294115363e-06 8.41588900856968e-06
-  hidden position_6_0 1.3251395643704604e-09
-  hidden position_6_1 -9.416053905270011e-12
-  hidden linearVelocity_6 -4.6189896919812264e-07 -8.56637966891427e-07 2.6321300715807524e-07
-  hidden angularVelocity_6 6.109105945283145e-07 2.609045004528199e-06 8.416569081897857e-06
-  hidden translation_7 0 1.3251395643704604e-09 0.09
-  hidden linearVelocity_7 -2.0898095179519442e-07 -9.082587571581625e-07 2.6086570962628275e-07
-  hidden angularVelocity_7 6.109099481137445e-07 2.6090447750399683e-06 8.416569021773416e-06
-  hidden linearVelocity_8 -3.7575380722073224e-07 -8.854565520420719e-07 2.659022140842164e-07
-  hidden angularVelocity_8 6.109099919335763e-07 2.6090449394344093e-06 8.416569092677388e-06
-  hidden rotation_9 0 1 0 0.13555319298082644
-  hidden linearVelocity_9 -2.0982453622658825e-06 -4.5171227148380065e-07 3.748923566426754e-07
-  hidden angularVelocity_9 4.459378587526989e-07 1.3558462702146487e-06 2.693291648447279e-06
-  hidden rotation_10 0 1 0 0.15759443472144916
-  hidden linearVelocity_10 -1.2415170726282066e-06 -4.526586567825397e-07 2.3720363115486975e-07
-  hidden angularVelocity_10 4.4593750523942046e-07 1.3551724012614769e-06 2.69329171089508e-06
-  hidden rotation_11 0 0.9999999999999999 0 0.08002783964909271
-  hidden linearVelocity_11 -2.0961477140790665e-06 7.844228622158611e-07 -2.3085519815779775e-07
-  hidden angularVelocity_11 4.463478109650649e-07 1.355828451284225e-06 2.6932916411110568e-06
-  hidden rotation_12 0 1 0 0.18948339639489925
-  hidden linearVelocity_12 -1.2394194035109107e-06 7.834764777051028e-07 -3.6854392293506066e-07
-  hidden angularVelocity_12 4.4634742481760014e-07 1.3551445548303155e-06 2.6932917041049454e-06
-  translation -1.6103310962357775 0.4836897110897762 0.10344921481012376
-  rotation -0.0004864297796398013 4.719044987192405e-05 0.9999998805795585 3.1404948433534052
+DEF STORE_YOUBOT_SORTER YoubotBoxGrip {
+  translation -9.353390254584658 6.981883928089616 0.1034688894482719
+  rotation -0.01302566423675633 0.7080023405642196 -0.7060899502377712 0.001486993900290688
   name "youBot sorter"
   controller "youbot_sorter_demo"
+  supervisor TRUE
+  bodySlot [
+    Pose {
+      translation 0 0.08 0.14
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.35 0.35 0.4
+            roughness 0.6
+          }
+          geometry Box {
+            size 0.22 0.18 0.02
+          }
+        }
+      ]
+    }
+    DistanceSensor {
+      translation 0.18 0 0.08
+      rotation 0 1 0 1.5707963267948966
+      name "front distance sensor"
+      lookupTable [
+        0 4095 0
+        0.05 3200 0.01
+        0.15 1800 0.02
+        0.35 700 0.04
+        0.6 150 0.06
+        1.0 0 0.08
+      ]
+      type "infra-red"
+    }
+  ]
 }
-DEF STORE_YOUBOT_RESTOCKER Youbot {
-  hidden position_0_0 -6.120925150179663e-09
-  hidden position_0_1 -7.073192583239669e-09
-  hidden position_0_2 8.724525484755256e-09
-  hidden position_0_3 1.3279896837924561e-08
-  hidden position_1_0 9.735088017007444e-06
-  hidden rotation_2 0 0 -1 0.02969344589681082
-  hidden position_2_0 1.2294956394792155e-06
-  hidden rotation_3 0 -1 0 1.2295038309536335e-06
-  hidden position_3_0 1.7328399541035765e-06
-  hidden rotation_4 0 -1 0 1.7328967762121065e-06
-  hidden position_4_0 -2.5149996292224986e-08
-  hidden rotation_5 0 1 0 2.9802322387695313e-08
-  hidden position_5_0 1.5537839943653342e-09
-  hidden position_6_0 4.683199702239826e-10
-  hidden position_6_1 -1.2646845021552518e-11
-  hidden translation_7 0 4.683199702239826e-10 0.09
-  hidden rotation_9 0 1 0 0.5309594316419967
-  hidden rotation_10 0 -1 0 0.0008061841388087507
-  hidden rotation_11 0 1 0 0.03091180349074265
-  hidden rotation_12 0 1 0 0.0408121942342964
-  translation -2.45218524173989 2.1083087335508646 0.10346888944958527
-  rotation 0.00038887920047123983 0.012383226116750272 -0.9999232492966192 0.08502514875671159
+DEF STORE_YOUBOT_RESTOCKER YoubotBoxGrip {
+  translation -1.87451 0.573775 0.103458
+  rotation -0.011047702244776967 0.9999389722620184 5.166130221864949e-06 0.0017881998985398793
   name "youBot restocker"
   controller "youbot_restocker_demo"
+  supervisor TRUE
 }
 Group {
   children [
@@ -197,9 +196,6 @@ Group {
       size 0.1 2.4 1.4
     }
     LeverValve {
-      hidden position_0_0 -3.999299045250021e-07
-      hidden translation_1 0 1.520967301457466e-08 -5.627442956068762e-15
-      hidden rotation_1 -1 0 0 7.408739861641004e-07
       translation 2.01 0.88 0.502
       rotation 0 0 -1 -1.5707953071795862
     }
@@ -243,18 +239,6 @@ Group {
     }
   ]
 }
-Robot {
-  translation 8.32 3.08 -0.21
-  children [
-    CardboardBox {
-      translation 0 0 0.5
-      size 0.3 0.3 0.3
-    }
-  ]
-  name "box_spawner"
-  controller "<none>"
-  supervisor TRUE
-}
 SolidBox {
   translation -2.205 0.5377 -0.585
   size 1 0.8 0.61
@@ -262,10 +246,6 @@ SolidBox {
   }
 }
 ConveyorBelt {
-  hidden translation_1 2.0860696658520084e-05 -4.822182453345647e-08 0.1263334648207509
-  hidden rotation_1 9.779792710161745e-05 0.9999999920344856 -7.979094072466457e-05 0.003306199016370784
-  hidden linearVelocity_1 -8.181239771491017e-08 2.5999470962387303e-07 -1.4854899839775726e-06
-  hidden angularVelocity_1 -4.3256811252566224e-08 -1.48293906553842e-05 -3.1078100409560005e-08
   translation 3.7 0.54 0
   rotation 0 0 1 3.141592
   name "conveyor_cardbox"
@@ -279,8 +259,6 @@ ConveyorBelt {
   speed 0.2
 }
 ConveyorBelt {
-  hidden translation_1 0 0 0.18740974800000154
-  hidden rotation_1 0 0 1 2.168404344971009e-19
   translation -5.24 -0.625782 -0.01
   rotation 0 0 1 3.14
   name "conveyor belt(1)"
@@ -307,8 +285,6 @@ Robot {
   supervisor TRUE
 }
 DEF RIGHT_BELT ConveyorBelt {
-  hidden translation_1 0 0 0.18740974800000154
-  hidden rotation_1 0 0 1 2.168404344971009e-19
   translation -0.67 -0.65 0
   rotation 0 0 1 3.14
   name "conveyor belt(2)"
@@ -347,7 +323,7 @@ Robot {
   controller "<none>"
   supervisor TRUE
 }
-Robot {
+DEF IPR_BOX_SPAWN_PAD Robot {
   translation 9.38 1.19 -0.1
   children [
     Receiver {
@@ -361,8 +337,8 @@ Robot {
   controller "<none>"
   supervisor TRUE
 }
-Robot {
-  translation -1.96 2.81 -0.1
+DEF BEER_STOCK Robot {
+  translation -10.5 1.83 -0.12
   children [
     Receiver {
       channel 3
@@ -371,12 +347,12 @@ Robot {
       translation 0 0 0.1
     }
   ]
-  name "right_pallet_spawner(2)"
+  name "BEER STOCK"
   controller "<none>"
   supervisor TRUE
 }
-Robot {
-  translation -0.64 1.83 0
+DEF CHIPS_STOCK Robot {
+  translation -10.5 3.5 -0.09
   children [
     Receiver {
       channel 3
@@ -385,7 +361,35 @@ Robot {
       translation 0 0 0.1
     }
   ]
-  name "right_pallet_spawner(3)"
+  name "CHIPS STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF CHEESE_STOCK Robot {
+  translation -10.52 5.27 -0.09
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "CHEESE STOCK"
+  controller "<none>"
+  supervisor TRUE
+}
+DEF MILK_STOCK Robot {
+  translation -10.51 7.14 -0.08
+  children [
+    Receiver {
+      channel 3
+    }
+    WoodenPallet {
+      translation 0 0 0.1
+    }
+  ]
+  name "MILK STOCK"
   controller "<none>"
   supervisor TRUE
 }
@@ -428,15 +432,10 @@ Robot {
   name "test_controller_sensor"
   controller "scanner_controller"
   supervisor TRUE
-  remoteControl "scanner_controller"
 }
 DEF AUTONOMOUS_GROCERY_STORE_PROTOTYPE Group {
   children [
     DEF GROCERY_CONVEYOR ConveyorBelt {
-      hidden translation_1 2.7995589807261467e-05 -1.5404119868556165e-08 0.07604383369772583
-      hidden rotation_1 -1.0702794221004103e-06 -0.9999999994829089 -3.2140889470047265e-05 0.0022818695735031844
-      hidden linearVelocity_1 7.546059461560617e-08 2.272917552313125e-07 3.9103771861448425e-07
-      hidden angularVelocity_1 -7.1949755630897565e-09 8.209795417394265e-06 5.0481899008321966e-08
       translation 4.1 0.54 0.02
       name "GROCERY_CONVEYOR"
       size 3.6 0.7 0.12
@@ -481,134 +480,8 @@ DEF AUTONOMOUS_GROCERY_STORE_PROTOTYPE Group {
   ]
 }
 IprHd6ms180 {
-  hidden position_0_0 1.5000024465150612
-  hidden rotation_1 0 0 1 1.6247934463439209
-  hidden position_1_0 -1.0000030458771396
-  hidden linearVelocity_1 -7.63836727697208e-09 5.619737227555963e-08 -1.3045454694989504e-12
-  hidden angularVelocity_1 -1.276473476969655e-08 -6.344940179737972e-10 4.8909835546413364e-05
-  hidden rotation_2 1 0 0 0.4022280458771416
-  hidden position_2_0 0.9999978598179508
-  hidden linearVelocity_2 3.4074149063076746e-08 -1.6162355628013168e-06 -2.3800864081173824e-11
-  hidden angularVelocity_2 -2.5397555123870443e-08 -1.2543258829993495e-09 4.8887256953297433e-05
-  hidden rotation_3 1 0 0 1.221802140182047
-  hidden position_3_0 -2.000000834312645
-  hidden linearVelocity_3 2.5655592739329244e-07 -6.180855262403828e-06 -2.390358250072658e-11
-  hidden angularVelocity_3 -2.4757555883874264e-08 -1.2121507027610143e-09 4.887033571615176e-05
-  hidden rotation_4 -1 0 0 0.0333091656873526
-  hidden position_4_0 -2.3094907511187486e-10
-  hidden linearVelocity_4 6.357559600242531e-07 -1.2381234432359022e-05 1.4926045485627267e-11
-  hidden angularVelocity_4 -2.4618715982091466e-08 -1.1955337381298348e-09 4.8862936749024426e-05
-  hidden rotation_5 0 0 1 2.9931899997690503
-  hidden position_5_0 0.9999999970256492
-  hidden position_5_1 1.0000000015243058
-  hidden linearVelocity_5 9.582637398728823e-07 -1.7715425863999273e-05 4.7265671344811994e-11
-  hidden angularVelocity_5 -2.4582061166899145e-08 -1.1840935672843145e-09 4.886081479648663e-05
-  hidden rotation_6 0 1 0 0.9999999970256493
-  hidden linearVelocity_6 -1.224094773456537e-06 -2.188329192084513e-05 -1.1534423764160944e-09
-  hidden angularVelocity_6 -2.4619798547998156e-08 -1.1819847465557402e-09 4.8860661422026866e-05
-  hidden translation_11 0.005790842514150185 3.361900013099106e-07 0.03248146145403208
-  hidden rotation_11 1.3431817810695587e-07 0.9999999999999907 2.729490833752231e-08 0.19200064453440838
-  hidden linearVelocity_11 -4.580285373596233e-07 -2.104794877319957e-05 -7.472309704326108e-10
-  hidden angularVelocity_11 -2.4619825261106342e-08 -1.18194164485435e-09 4.886066064623627e-05
-  hidden translation_12 0.0001514981032455509 -6.0318902188327694e-06 0.08381251093165787
-  hidden rotation_12 -0.043051104149603295 -0.9975777813431578 0.05463673308281861 2.3949966849726934e-06
-  hidden linearVelocity_12 -2.308337208481906e-06 -2.2853030160434225e-05 -1.7232261040334152e-09
-  hidden angularVelocity_12 -2.4619786318563727e-08 -1.1819848894866209e-09 4.886066102972182e-05
-  hidden rotation_14 0 -1 0 1.0000000015243058
-  hidden linearVelocity_14 3.5763060278554947e-06 -2.16099035209811e-05 1.2680675782937168e-09
-  hidden angularVelocity_14 -2.4540033403688803e-08 -1.1769866232356592e-09 4.8860665586760745e-05
-  hidden translation_19 -0.007821087338244048 -5.764868470370388e-07 0.03245944970358661
-  hidden rotation_19 -4.06749248026332e-09 -1 -5.663148858108568e-09 -2.94968444316507
-  hidden linearVelocity_19 2.7724560662282832e-06 -2.0779814884381915e-05 8.843341348097055e-10
-  hidden angularVelocity_19 -2.4540024403180762e-08 -1.1769299375610147e-09 4.886066481973521e-05
-  hidden translation_20 -0.0001815849442827755 7.048012254370906e-05 0.08365362064108961
-  hidden rotation_20 -9.491723710036289e-07 -0.9999999999995358 -1.6548178339697663e-07 3.141500377454657
-  hidden linearVelocity_20 4.7519730200446475e-06 -2.2445433468400218e-05 1.8384157574047323e-09
-  hidden angularVelocity_20 -2.4540037243929192e-08 -1.1769738675013851e-09 4.886066519498639e-05
   translation 8.93 0.59 0
-  rotation 0 0 -1 -3.1415853071795863
+  rotation 0 0 -1 -3.0106903061004253
   controller "ipr_pick_demo"
   supervisor TRUE
-}
-DEF DEMO_BOTTLE_6 BeerBottle {
-  hidden linearVelocity_0 0.00017260928462753134 -0.016542393319780854 -3.1923439525958953e-16
-  hidden angularVelocity_0 0.5336255877923605 0.005568041406538457 -5.8152886149951834e-05
-  translation -0.9080456619387929 4.303969956259421 0.030988116757795368
-  rotation 0.022212916210589476 0.999220506608944 0.03263380954756066 1.571971515137786
-  name "beer bottle(2)"
-  mass 0.1
-}
-DEF DEMO_BOTTLE_0 BeerBottle {
-  translation -1.9989971938351545 2.059135015321599 0.03098811675779574
-  rotation -0.3745474685567701 -0.6230070918931206 0.6867141743466435 2.673936251181106
-  name "beer bottle(3)"
-  mass 0.1
-}
-DEF DEMO_BOTTLE_2 BeerBottle {
-  hidden linearVelocity_0 0.31569389976474266 0.006217898328172019 -2.8860802084962314e-16
-  hidden angularVelocity_0 -0.20057736423400493 10.18367412549536 -0.0011099405105172257
-  translation 160.10543818521367 4.293852689238942 0.030988116757801457
-  rotation 0.34614170066368827 -0.6600789672105744 -0.6666945928293337 -2.4986197518317894
-  name "beer bottle(5)"
-  mass 0.1
-}
-DEF DEMO_BOTTLE_0 BeerBottle {
-  hidden linearVelocity_0 0.0002475822267262652 0.0035308816825292836 1.8790590763085896e-17
-  hidden angularVelocity_0 -0.11389939828595982 0.007986522683541067 -4.9786607008165704e-05
-  translation -0.40137228699865507 -8.161256950945898 0.03095247587150142
-  rotation 0.01656198506491574 -0.9961435170869559 -0.08616144158693811 1.5787150294698329
-  name "beer bottle(6)"
-}
-DEF DEMO_BOTTLE_1 BeerBottle {
-  translation 1.410500946079353 -2.0184789020968337 0.030942699498075356
-  rotation -0.5863335571690893 -0.5496332502457745 0.5950766756996178 2.15163566502927
-  name "beer bottle(7)"
-}
-DEF DEMO_BOTTLE_2 BeerBottle {
-  hidden linearVelocity_0 1.778759948301298e-06 -1.828106335478863e-06 -7.375244831180795e-05
-  hidden angularVelocity_0 4.351817626375339e-05 -1.6459624591783265e-05 -3.439675265135075e-05
-  translation -1.2994459152309323 0.6307713454404026 0.17827217865556008
-  rotation -0.04795645890492505 0.9983169256889971 -0.03261125468560769 1.5691139774488505
-  name "beer bottle(11)"
-}
-DEF DEMO_BOTTLE_3 BeerBottle {
-  hidden linearVelocity_0 0.00012466194532178676 5.763935809635079e-06 -3.949242428989308e-05
-  hidden angularVelocity_0 -6.012348109538831e-05 0.001285634199112 3.646807317253247e-05
-  translation -1.2765217081811302 0.5691585489166417 0.14939943560322044
-  rotation 0.023379235303265564 0.004287560975194121 0.9997174741783392 2.7572862855691764
-  name "beer bottle(12)"
-}
-DEF DEMO_BOTTLE_4 BeerBottle {
-  hidden linearVelocity_0 0.0004327093176780332 0.01953960045765325 2.44544217256388e-16
-  hidden angularVelocity_0 -0.6303096322617681 0.013958363759431717 0.0002749074317061412
-  translation 2.5294074217613662 -6.826971170104009 0.030952475871500372
-  rotation 0.2738336560622575 -0.9157674999776222 0.29391327767270575 -1.6659701870277361
-}
-DEF DEMO_BOTTLE_0 BeerBottle {
-  hidden linearVelocity_0 0.00013081191127124915 -2.9849746912483934e-05 -4.1849830213571696e-05
-  hidden angularVelocity_0 0.00030300990186397074 0.0013778388713262908 1.015534373443437e-06
-  translation -1.2690724340657678 0.5070818500846681 0.1478967626746306
-  rotation -0.0014709756540537897 -0.00042498678960851684 0.9999988278077399 2.6752490601527334
-  name "BEER_BOTTLE"
-}
-DEF DEMO_BOTTLE_1 BeerBottle {
-  hidden linearVelocity_0 0.0001321779413275659 6.573553679811162e-05 -1.4989230707440626e-05
-  hidden angularVelocity_0 -0.0006729547050462166 0.0014071421760112023 -0.00016880930244128284
-  translation -1.3380833585693794 0.5753594269432624 0.15242500996419306
-  rotation 0.015753167846406575 0.030380880726721796 0.9994142483420334 1.853610054501853
-  name "BEER_BOTTLE(1)"
-}
-DEF DEMO_BOTTLE_2 BeerBottle {
-  hidden linearVelocity_0 -0.19997483993786383 -0.0001812540464599049 -0.0007504718050134366
-  hidden angularVelocity_0 0.0018207977720069094 0.000244360026487925 5.9685026144763155e-06
-  translation -1.0090694221486116 0.566205472657848 0.1487559570478294
-  rotation -0.0018469634974715035 -0.0010834375150344938 0.999997707441867 2.018183184325704
-  name "BEER_BOTTLE(2)"
-}
-DEF DEMO_BOTTLE_3 BeerBottle {
-  hidden linearVelocity_0 -0.19982045105095245 -0.0004372319718105407 -0.0007136064492323465
-  hidden angularVelocity_0 0.004381132546587052 0.0017915433222519376 1.4381927526594582e-05
-  translation 7.439064307766625 0.5662499075282209 0.17668691615409024
-  rotation -0.0018121957322416759 -0.0009491116603267695 0.999997907564653 2.0123247635947967
-  name "BEER_BOTTLE(3)"
 }

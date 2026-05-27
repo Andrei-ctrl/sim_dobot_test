@@ -1,0 +1,50 @@
+#VRML_SIM R2025a utf8
+# Small cheese wedge for grocery shelf / sorter testing.
+
+PROTO CheeseWedge [
+  field SFVec3f    translation  0 0 0
+  field SFRotation rotation     0 0 1 0
+  field SFString   name         "CHEESE"
+  field SFFloat    mass         0.09
+]
+{
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    children [
+      Shape {
+        appearance PBRAppearance {
+          baseColor 0.95 0.78 0.28
+          roughness 0.48
+          metalness 0
+        }
+        geometry Box {
+          size 0.09 0.06 0.05
+        }
+      }
+      Pose {
+        translation 0.02 0 0.012
+        rotation 0 0 1 0.35
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.88 0.65 0.18
+              roughness 0.5
+            }
+            geometry Box {
+              size 0.05 0.04 0.025
+            }
+          }
+        ]
+      }
+    ]
+    boundingObject Box {
+      size 0.09 0.06 0.05
+    }
+    physics Physics {
+      density -1
+      mass IS mass
+    }
+  }
+}

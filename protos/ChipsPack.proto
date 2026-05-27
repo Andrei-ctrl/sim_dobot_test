@@ -1,0 +1,49 @@
+#VRML_SIM R2025a utf8
+# Small chips bag for grocery shelf / sorter testing.
+
+PROTO ChipsPack [
+  field SFVec3f    translation  0 0 0
+  field SFRotation rotation     0 0 1 0
+  field SFString   name         "CHIPS"
+  field SFFloat    mass         0.08
+]
+{
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    children [
+      Shape {
+        appearance PBRAppearance {
+          baseColor 0.95 0.82 0.12
+          roughness 0.5
+          metalness 0
+        }
+        geometry Box {
+          size 0.10 0.14 0.035
+        }
+      }
+      Pose {
+        translation 0 0 0.018
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.85 0.15 0.12
+              roughness 0.45
+            }
+            geometry Box {
+              size 0.04 0.05 0.008
+            }
+          }
+        ]
+      }
+    ]
+    boundingObject Box {
+      size 0.10 0.14 0.035
+    }
+    physics Physics {
+      density -1
+      mass IS mass
+    }
+  }
+}

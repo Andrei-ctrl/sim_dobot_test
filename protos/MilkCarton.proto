@@ -1,0 +1,49 @@
+#VRML_SIM R2025a utf8
+# Small milk carton for grocery shelf / sorter testing.
+
+PROTO MilkCarton [
+  field SFVec3f    translation  0 0 0
+  field SFRotation rotation     0 0 1 0
+  field SFString   name         "MILK"
+  field SFFloat    mass         0.10
+]
+{
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    children [
+      Shape {
+        appearance PBRAppearance {
+          baseColor 0.92 0.95 1.0
+          roughness 0.4
+          metalness 0
+        }
+        geometry Box {
+          size 0.045 0.045 0.11
+        }
+      }
+      Pose {
+        translation 0 0 0.062
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.25 0.45 0.85
+              roughness 0.35
+            }
+            geometry Box {
+              size 0.046 0.046 0.018
+            }
+          }
+        ]
+      }
+    ]
+    boundingObject Box {
+      size 0.045 0.045 0.11
+    }
+    physics Physics {
+      density -1
+      mass IS mass
+    }
+  }
+}
